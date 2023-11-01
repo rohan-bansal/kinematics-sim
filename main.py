@@ -1,31 +1,27 @@
-import numpy
+import matplotlib.pyplot as plt
+import numpy as np
 
-# write a class that implements the kinematic bicycle model (linearized) using numpy
+from models import KinematicBicycleModel
 
-class KinematicBicycleModel:
+dt = 0.01
+v = np.pi
+w = np.arctan(2/10)
+L = 2 # 2m wheelbase
 
-    # state initialization: x, y, vehicle yaw, velocity
-    # parameters: x, y, vehicle yaw, wheelbase 
-    def __init__(self, x, y, theta, L):
-        self.v = 0
-        self.x = x
-        self.y = y
-        self.theta = theta
-        self.L = L
-        self.state = [self.x, self.y, self.theta, self.v]
-    
-    # control input: velocity, steering angle
-    def step(self, v, w):
-        self.v = v
-        self.w = w
+bicycleModel = KinematicBicycleModel(0, 0, L)
+bicycleModel.delta = np.arctan(2/10)
 
-        self.x += self.v * numpy.cos(self.theta)
-        self.y += self.v * numpy.sin(self.theta)
+t_data = np.arange(0, 20, dt)
+x_data = np.zeros_like(t_data)
+y_data = np.zeros_like(t_data)
 
-        self.theta += self.v * numpy.tan(self.w) / self.L
-        self.state = [self.x, self.y, self.theta, self.v]
-        return self.state
-    
-    def get_state(self):
-        return self.state
+for i in range(t_data.shape[0]):
+    print(bicycleModel.get_state())
+    x_data[i] = bicycleModel.get_state()[0]
+    y_data[i] = bicycleModel.get_state()[1]
+    bicycleModel.step(v=v, dt=dt)
 
+plt.axis('equal')
+plt.plot(x_data, y_data)
+
+plt.show()
