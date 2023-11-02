@@ -3,7 +3,7 @@ import numpy as np
 class KinematicBicycleModel:
 
     # state initialization: x, y, vehicle yaw, velocity
-    # parameters: x, y, vehicle yaw, wheelbase 
+    # parameters: x, y, wheelbase 
     def __init__(self, x, y, L):
         self.v = 0
         self.x = x
@@ -18,8 +18,10 @@ class KinematicBicycleModel:
 
         self.state = [self.x, self.y, self.theta, self.v]
     
-    # control input: velocity, steering angle rate
     def step(self, v=0, w=0, delta=0, dt=0.01):
+
+        if delta != 0:
+            self.delta = delta
 
         if w > self.max_w:
             w = self.max_w
@@ -38,7 +40,9 @@ class KinematicBicycleModel:
         self.x += x_update * dt
         self.y += y_update * dt
         self.theta += theta_update * dt
-        self.delta += self.w * dt
+
+        if delta == 0:
+            self.delta += self.w * dt
 
         self.state = [self.x, self.y, self.theta, self.v]
 

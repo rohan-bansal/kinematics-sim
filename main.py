@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from models import KinematicBicycleModel
+from lib.models import KinematicBicycleModel
 
 dt = 0.01
 v = np.pi
@@ -16,7 +16,7 @@ x_data = np.zeros_like(t_data)
 y_data = np.zeros_like(t_data)
 
 for i in range(t_data.shape[0]):
-    print(bicycleModel.get_state())
+    # print(bicycleModel.get_state())
     x_data[i] = bicycleModel.get_state()[0]
     y_data[i] = bicycleModel.get_state()[1]
     bicycleModel.step(v=v, dt=dt)
