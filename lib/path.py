@@ -2,13 +2,17 @@ import numpy as np
 
 
 class Pose:
-      # heading is in radians
-      def __init__(self, x=0, y=0, heading=0, velocity=0, acceleration=0):
-            self.x = x
-            self.y = y
-            self.heading = heading
-            self.velocity = velocity # dy/dx
-            self.acceleration = acceleration # d2y/dx2
+    # heading is in radians
+    def __init__(self, x=0, y=0, heading=0, velocity=0, acceleration=0):
+        self.x = x
+        self.y = y
+        self.heading = heading
+        self.velocity = velocity # dy/dx
+        self.acceleration = acceleration # d2y/dx2
+        
+    def __str__(self):
+        return "x: " + str(self.x) + ", y: " + str(self.y) + ", heading: " + str(self.heading) + ", velocity: " + str(self.velocity) + ", acceleration: " + str(self.acceleration)
+    
 
 # Cubic Hermite Spline path
 # https://www.rose-hulman.edu/~finn/CCLI/Notes/day09.pdf
@@ -143,6 +147,8 @@ class CubicHermiteSpline:
                 min_t = t
                 min_x = x
                 min_y = y
+
+        # print(min_t)
 
         return (min_t, min_distance, min_x, min_y)
     

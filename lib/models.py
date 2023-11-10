@@ -16,19 +16,16 @@ class KinematicBicycleModel:
 
         self.max_w = np.pi/4
 
-        self.state = [self.x, self.y, self.theta, self.v]
+        self.state = [self.x, self.y, self.theta, self.v, self.delta]
     
-    def step(self, v=0, w=0, delta=0, dt=0.01):
-
-        if delta != 0:
-            self.delta = delta
+    def step(self, a=0, w=0, dt=0.01):
 
         if w > self.max_w:
             w = self.max_w
         elif w < -self.max_w:
             w = -self.max_w
 
-        self.v = v
+        self.v += a * dt
         self.w = w
 
         theta_update = (self.v / self.L) * (np.cos(self.beta) * np.tan(self.delta))
@@ -41,10 +38,9 @@ class KinematicBicycleModel:
         self.y += y_update * dt
         self.theta += theta_update * dt
 
-        if delta == 0:
-            self.delta += self.w * dt
+        self.delta += self.w * dt
 
-        self.state = [self.x, self.y, self.theta, self.v]
+        self.state = [self.x, self.y, self.theta, self.v, self.delta]
 
 
         return self.state
