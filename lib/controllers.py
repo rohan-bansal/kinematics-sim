@@ -60,29 +60,20 @@ class PurePursuitController:
 
 
     # t between 0 and 1
-    def step(self, t, plt):
+    def step(self, plt):
         x, y, theta, v, delta = self.model.get_state()
         
-        # lookahead distance is function of speed
         lookahead_distance = np.clip(self.LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
-        # print(lookahead_distance)
 
         closest_t, lat_error, closest_x, closest_y = self.path.closestPointOnCurve((x, y))
-        # print(closest_t)
 
 
         distanceTraveled = self.path.getLengthToT(closest_t)
-        # print(closest_t, distanceTraveled)
         lookaheadPoint = self.getLookaheadPoint(distanceTraveled, lookahead_distance)
-        # circle = self.getTangentCircle((x, y), lookaheadPoint)
 
-        # plot lookahead
         plt.plot(lookaheadPoint[0], lookaheadPoint[1], 'ro')
-        # print(lookaheadPoint)
-
 
         alpha = np.arctan2(lookaheadPoint[1], lookaheadPoint[0]) - np.arctan2(y, x)
-        print(alpha)
         steer = np.arctan((2 * self.model.L * np.sin(alpha)) / lookahead_distance)
 
         return steer

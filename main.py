@@ -9,7 +9,7 @@ dt = 0.01
 L = 2 # 2m wheelbase
 
 bicycleModel = KinematicBicycleModel(0, 0, L)
-bicycleModel.v = 5
+# bicycleModel.v = 5
 
 t_data = np.arange(0, 1, dt)
 waypoints = [
@@ -20,37 +20,45 @@ waypoints = [
 ]
 path = CubicHermiteSpline(waypoints)
 controller = PurePursuitController(bicycleModel, path)
-# PID = PIDController(0.5, 0.0, 0.0, 10)
+PID = PIDController(1, 0.0, 0.0, 5)
 
 x_data = np.zeros_like(t_data)
 y_data = np.zeros_like(t_data)
 
-model_x_data = np.zeros_like(t_data)
-model_y_data = np.zeros_like(t_data)
+model_x_data = []
+model_y_data = []
+
+plt.title("Kinematic Bicycle Motion Model")
+plt.axis('equal')
 
 for i in range(t_data.shape[0]):
 
     x_data[i], y_data[i] = path.getPosition(t_data[i])
 
-    model_x_data[i] = bicycleModel.get_state()[0]
-    model_y_data[i] = bicycleModel.get_state()[1]
+try:
+    while True:
 
-    steer_angle = controller.step(t_data[i], plt)
-    bicycleModel.delta = steer_angle
+        # clear plot and draw new
+        plt.clf()
+        plt.axis('equal')
+        plt.plot(x_data, y_data, label="desired trajectory")
+        plt.plot(model_x_data, model_y_data, label="model trajectory")
 
-    # PIDoutput = PID.step(bicycleModel.get_state()[3], dt)
+        model_x_data.append(bicycleModel.get_state()[0])
+        model_y_data.append(bicycleModel.get_state()[1])
 
-    bicycleModel.step(dt=dt)
+        steer_angle = controller.step(plt)
+        bicycleModel.delta = steer_angle
 
+        PIDoutput = PID.step(bicycleModel.get_state()[3], dt)
+        bicycleModel.v = PIDoutput
 
-plt.title("Kinematic Bicycle Motion Model")
-plt.axis('equal')
-plt.plot(x_data, y_data, label="desired trajectory")
-plt.plot(model_x_data, model_y_data, label="model trajectory")
-plt.legend(loc="upper left")
+        bicycleModel.step(dt=dt)
 
+        plt.pause(0.01)
+except KeyboardInterrupt:
+    pass
 
-plt.show()
 
 
 """
