@@ -78,7 +78,6 @@ class PurePursuitController:
         alpha = np.arctan2(lookaheadPoint[1], lookaheadPoint[0]) - np.arctan2(y, x)
         steer = np.arctan((2 * self.model.L * np.sin(alpha)) / self.lookahead_distance)
 
-        steer_rate = (steer - self.steer_prev) / dt
-        self.steer_prev = steer
+        # print(steer)
 
-        return steer_rate
+        return steer

@@ -49,8 +49,8 @@ try:
         model_x_data.append(cBicycleModel.x)
         model_y_data.append(cBicycleModel.y)
 
-        steer_rate = controller.step(plt)
-        cBicycleModel.step(path=path, delta_dot=steer_rate, dt=dt)
+        steer = controller.step(plt)
+        cBicycleModel.step(path=path, delta=steer, dt=dt)
         # bicycleModel.delta = steer_angle
 
         # PIDoutput = PID.step(bicycleModel.get_state()[3], dt)

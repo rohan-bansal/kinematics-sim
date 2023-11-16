@@ -111,7 +111,11 @@ class CurvilinearKinematicBicycleModel:
     # e_y_dot = change in lateral error with respect to time
     # rho = curvature of curve at closest point
 
-    def step(self, path: CubicHermiteSpline, delta_dot=0, dt=0.01):
+    def step(self, path: CubicHermiteSpline, delta=0, dt=0.01):
+
+        delta_dot = (delta - self.delta) / dt
+
+        # print(delta, self.delta, delta_dot)
 
         self.vy = (self.vx * self.delta * self.Lr) / (self.Lf + self.Lr)
 
@@ -122,7 +126,9 @@ class CurvilinearKinematicBicycleModel:
         dx, dy = path.getVelocity(t)
 
         # angle between heading and tangent line
-        self.e_psi = angle_between_heading_and_tangent(self.theta, (dx, dy))
+        self.e_psi = np.arctan2(dy, dx) - self.theta
+        # self.e_psi = angle_between_heading_and_tangent(self.theta, (dx, dy))
+        print(self.e_psi)
 
         self.e_y = dist
         rho = path.getCurvature(t)
@@ -135,8 +141,8 @@ class CurvilinearKinematicBicycleModel:
 
         self.s += s_dot * dt
 
-        # change delta by delta dot
-        self.delta += delta_dot * dt
+        # change delta
+        self.delta = delta
 
         # change theta
         self.theta += e_psi_dot * dt
