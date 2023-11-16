@@ -115,23 +115,23 @@ class CurvilinearKinematicBicycleModel:
 
         delta_dot = (delta - self.delta) / dt
 
-        # print(delta, self.delta, delta_dot)
+        print(delta, self.delta, delta_dot)
 
         self.vy = (self.vx * self.delta * self.Lr) / (self.Lf + self.Lr)
 
         # lateral error from path
         t, dist, _, _ = path.closestPointOnCurve((self.x, self.y))
+        self.e_y = dist
 
         # gets slope of tangent at t
         dx, dy = path.getVelocity(t)
+        rho = path.getCurvature(t)
 
         # angle between heading and tangent line
         self.e_psi = np.arctan2(dy, dx) - self.theta
         # self.e_psi = angle_between_heading_and_tangent(self.theta, (dx, dy))
-        print(self.e_psi)
+        # print(self.e_psi)
 
-        self.e_y = dist
-        rho = path.getCurvature(t)
 
         s_dot =  1 / (1 - self.e_y * rho) * (self.vx - self.vx * self.delta * self.e_psi * self.Lr / (self.Lf + self.Lr))
         e_psi_dot = self.vx * self.delta / (self.Lf + self.Lr) - rho * self.vx + delta_dot * self.Lr / (self.Lf + self.Lr)

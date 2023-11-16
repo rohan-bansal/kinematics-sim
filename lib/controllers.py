@@ -1,6 +1,6 @@
 import numpy as np
 from lib.path import Pose, CubicHermiteSpline
-from lib.models import KinematicBicycleModel
+from lib.models import KinematicBicycleModel, CurvilinearKinematicBicycleModel
 
 
 class PIDController:
@@ -29,7 +29,7 @@ class PIDController:
 
 class PurePursuitController:
     
-    def __init__(self, model: KinematicBicycleModel, path: CubicHermiteSpline):
+    def __init__(self, model: CurvilinearKinematicBicycleModel, path: CubicHermiteSpline):
         self.model = model
         self.path = path
 
@@ -63,7 +63,9 @@ class PurePursuitController:
 
     # t between 0 and 1
     def step(self, plt, dt=0.01):
-        x, y, theta, v, delta = self.model.get_state()
+        x = self.model.x
+        y = self.model.y
+        v = self.model.vx
         
         self.lookahead_distance = np.clip(self.LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
 

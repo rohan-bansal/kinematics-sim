@@ -21,7 +21,7 @@ waypoints = [
     Pose(x=30, y=30, heading=0, velocity=20)
 ]
 path = CubicHermiteSpline(waypoints)
-controller = PurePursuitController(bicycleModel, path)
+controller = PurePursuitController(cBicycleModel, path)
 PID = PIDController(0.5, 0, 0, 10)
 
 x_data = np.zeros_like(t_data)
@@ -59,7 +59,7 @@ try:
 
         # cbicycleModel.step(dt=dt)
 
-        plt.pause(0.1)
+        plt.pause(1)
 except KeyboardInterrupt:
     pass
 
