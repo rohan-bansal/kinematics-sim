@@ -37,6 +37,8 @@ class PurePursuitController:
 
         self.min_LD = 0.1
         self.max_LD = 20
+        self.lookahead_distance = 0
+        self.steer_prev = 0
 
     def getLookaheadPoint(self, distanceTraveled, lookahead_distance):
         path_length = self.path.getLengthToT(1)
@@ -60,20 +62,23 @@ class PurePursuitController:
 
 
     # t between 0 and 1
-    def step(self, plt):
+    def step(self, plt, dt=0.01):
         x, y, theta, v, delta = self.model.get_state()
         
-        lookahead_distance = np.clip(self.LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
+        self.lookahead_distance = np.clip(self.LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
 
         closest_t, lat_error, closest_x, closest_y = self.path.closestPointOnCurve((x, y))
 
 
         distanceTraveled = self.path.getLengthToT(closest_t)
-        lookaheadPoint = self.getLookaheadPoint(distanceTraveled, lookahead_distance)
+        lookaheadPoint = self.getLookaheadPoint(distanceTraveled, self.lookahead_distance)
 
         plt.plot(lookaheadPoint[0], lookaheadPoint[1], 'ro')
 
         alpha = np.arctan2(lookaheadPoint[1], lookaheadPoint[0]) - np.arctan2(y, x)
-        steer = np.arctan((2 * self.model.L * np.sin(alpha)) / lookahead_distance)
+        steer = np.arctan((2 * self.model.L * np.sin(alpha)) / self.lookahead_distance)
 
-        return steer
+        steer_rate = (steer - self.steer_prev) / dt
+        self.steer_prev = steer
+
+        return steer_rate

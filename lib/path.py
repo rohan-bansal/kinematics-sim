@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class Pose:
     # heading is in radians
     def __init__(self, x=0, y=0, heading=0, velocity=0, acceleration=0):
@@ -130,6 +129,12 @@ class CubicHermiteSpline:
             [0.279705391489277, 0.741531185599395],
             [0.12948496616887, -0.949107912342759],
             [0.12948496616887, 0.949107912342759]]
+    
+    def getCurvature(self, t):
+        vx, vy = self.getVelocity(t)
+        ax, ay = self.getAcceleration(t)
+
+        return (vx * ay - vy * ax) / (vx**2 + vy**2)**(3/2)
 
     def closestPointOnCurve(self, otherPoint):
 
