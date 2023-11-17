@@ -97,7 +97,7 @@ class CurvilinearKinematicBicycleModel:
         self.e_y = 0
         self.e_psi = 0
 
-        self.state = [self.s, self.delta, self.e_y, self.e_psi]
+        self.state = [self.s, self.delta, self.vx, self.e_y, self.e_psi]
 
     
     # delta_dot = change in steer angle with respect to time
@@ -115,41 +115,28 @@ class CurvilinearKinematicBicycleModel:
 
         delta_dot = (delta - self.delta) / dt
 
-        print(delta, self.delta, delta_dot)
+        t = path.getTFromLength(self.s)
+        pose = path.getPoseAt(t)
 
-        self.vy = (self.vx * self.delta * self.Lr) / (self.Lf + self.Lr)
-
-        # lateral error from path
-        t, dist, _, _ = path.closestPointOnCurve((self.x, self.y))
-        self.e_y = dist
-
-        # gets slope of tangent at t
         dx, dy = path.getVelocity(t)
         rho = path.getCurvature(t)
-
-        # angle between heading and tangent line
-        self.e_psi = np.arctan2(dy, dx) - self.theta
-        # self.e_psi = angle_between_heading_and_tangent(self.theta, (dx, dy))
-        # print(self.e_psi)
 
 
         s_dot =  1 / (1 - self.e_y * rho) * (self.vx - self.vx * self.delta * self.e_psi * self.Lr / (self.Lf + self.Lr))
         e_psi_dot = self.vx * self.delta / (self.Lf + self.Lr) - rho * self.vx + delta_dot * self.Lr / (self.Lf + self.Lr)
-        e_y_dot = self.vx * self.delta * self.Lr / (self.Lf + self.Lr) + self.vx * self.theta
-
-        # theta_dot = (self.vx * self.delta) / (self.Lf + self.Lr)
+        e_y_dot = self.vx * self.delta * self.Lr / (self.Lf + self.Lr) + self.vx * self.e_psi
 
         self.s += s_dot * dt
 
-        # change delta
-        self.delta = delta
+        self.delta += delta_dot * dt
 
-        # change theta
+        self.e_psi += e_psi_dot * dt
+        self.e_y += e_y_dot * dt
+
         self.theta += e_psi_dot * dt
 
-        # change x, y by lateral error dot, s_dot, and theta
-        self.x += s_dot * np.cos(self.theta) - e_y_dot * np.sin(self.theta)
-        self.y += s_dot * np.sin(self.theta) + e_y_dot * np.cos(self.theta)
-
+        tan_angle = np.arctan2(dy, dx)
+        self.x = pose.x - self.e_y * np.sin(tan_angle)
+        self.y = pose.y + self.e_y * np.cos(tan_angle)
 
         return self.state
