@@ -76,10 +76,11 @@ def angle_between_heading_and_tangent(heading_angle, tangent_vector):
 class CurvilinearKinematicBicycleModel:
 
     # parameters: wheelbase 
-    def __init__(self, L):
+    def __init__(self, path, L):
 
         self.x = 0
         self.y = 0
+        self.path = path
 
         # longitudinal speed (along the curve)
         self.vx = 0
@@ -99,6 +100,51 @@ class CurvilinearKinematicBicycleModel:
 
         self.state = [self.s, self.delta, self.vx, self.e_y, self.e_psi]
 
+    def linearize(self, nominal_state, nominal_ctrl, dt):
+        nominal_state = np.array(nominal_state).copy()
+        nominal_ctrl = np.array(nominal_ctrl).copy()
+        epsilon = 1e-2
+        # A = df/dx
+        A = np.zeros((self.n, self.n), dtype=float)
+        # find A
+        for i in range(self.n):
+            # d x / d x_i, ith row in A
+            x_l = nominal_state.copy()
+            x_l[i] -= epsilon
+            x_post_l = self.propagate(x_l, nominal_ctrl, dt)
+            x_r = nominal_state.copy()
+            x_r[i] += epsilon
+            x_post_r = self.propagate(x_r, nominal_ctrl, dt)
+            A[:, i] += (x_post_r.flatten() - x_post_l.flatten()) / (2 * epsilon)
+
+        # B = df/du
+        B = np.zeros((5, 1), dtype=float)
+        # find B
+        for i in range(1):
+            # d x / d u_i, ith row in B
+            x0 = nominal_state.copy()
+            u_l = nominal_ctrl.copy()
+            u_l[i] -= epsilon
+            x_post_l = self.propagate(x0, u_l, dt)
+            x_post_l = x_post_l.copy()
+
+            x0 = nominal_state.copy()
+            u_r = nominal_ctrl.copy()
+            u_r[i] += epsilon
+            x_post_r = self.propagate(x0, u_r, dt)
+            x_post_r = x_post_r.copy()
+
+            B[:, i] += (x_post_r.flatten() - x_post_l.flatten()) / (2 * epsilon)
+
+        x0 = nominal_state.copy()
+        u0 = nominal_ctrl.copy()
+        x_post = self.propagate(x0, u0, dt)
+        # d = x_k+1 - Ak*x_k - Bk*u_k
+        x0 = nominal_state.copy()
+        u0 = nominal_ctrl.copy()
+        d = x_post.flatten() - A @ x0 - B @ u0
+        return A, B, d
+
     
     # delta_dot = change in steer angle with respect to time
     # delta = steer angle
@@ -111,15 +157,15 @@ class CurvilinearKinematicBicycleModel:
     # e_y_dot = change in lateral error with respect to time
     # rho = curvature of curve at closest point
 
-    def step(self, path: CubicHermiteSpline, delta=0, dt=0.01):
+    def step(self, delta=0, dt=0.01):
 
         delta_dot = (delta - self.delta) / dt
 
-        t = path.getTFromLength(self.s)
-        pose = path.getPoseAt(t)
+        t = self.path.getTFromLength(self.s)
+        pose = self.path.getPoseAt(t)
 
-        dx, dy = path.getVelocity(t)
-        rho = path.getCurvature(t)
+        dx, dy = self.path.getVelocity(t)
+        rho = self.path.getCurvature(t)
 
 
         s_dot =  1 / (1 - self.e_y * rho) * (self.vx - self.vx * self.delta * self.e_psi * self.Lr / (self.Lf + self.Lr))
@@ -140,3 +186,31 @@ class CurvilinearKinematicBicycleModel:
         self.y = pose.y + self.e_y * np.cos(tan_angle)
 
         return self.state
+
+    # step function but isolated from the system - uses a given state, control, and dt.
+    def propagate(self, state, control, dt=0.01):
+
+        s, delta, vx, e_y, e_psi = state
+        new_delta = control
+
+        delta_dot = (new_delta - delta) / dt
+
+        t = self.path.getTFromLength(s)
+        pose = self.path.getPoseAt(t)
+
+        dx, dy = self.path.getVelocity(t)
+        rho = self.path.getCurvature(t)
+
+
+        s_dot =  1 / (1 - e_y * rho) * (vx - vx * delta * e_psi * self.Lr / (self.Lf + self.Lr))
+        e_psi_dot = vx * delta / (self.Lf + self.Lr) - rho * vx + delta_dot * self.Lr / (self.Lf + self.Lr)
+        e_y_dot = vx * delta * self.Lr / (self.Lf + self.Lr) + vx * e_psi
+
+        s += s_dot * dt
+
+        delta += delta_dot * dt
+
+        e_psi += e_psi_dot * dt
+        e_y += e_y_dot * dt
+
+        return [s, delta, vx, e_y, e_psi]

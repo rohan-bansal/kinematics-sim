@@ -8,9 +8,6 @@ from lib.controllers import PIDController, PurePursuitController
 dt = 0.01   
 L = 2 # 2m wheelbase
 
-cBicycleModel = CurvilinearKinematicBicycleModel(L)
-cBicycleModel.vx = 5
-
 t_data = np.arange(0, 1, dt)
 waypoints = [
     Pose(x=0, y=0, heading=0, velocity=20), 
@@ -19,6 +16,11 @@ waypoints = [
     Pose(x=30, y=30, heading=0, velocity=20)
 ]
 path = CubicHermiteSpline(waypoints)
+
+
+cBicycleModel = CurvilinearKinematicBicycleModel(path, L)
+cBicycleModel.vx = 5
+
 controller = PurePursuitController(cBicycleModel, path)
 
 x_data = np.zeros_like(t_data)
@@ -47,7 +49,7 @@ try:
         model_y_data.append(cBicycleModel.y)
 
         steer = controller.step(plt)
-        cBicycleModel.step(path=path, delta=steer, dt=dt)
+        cBicycleModel.step(delta=steer, dt=dt)
 
 
         plt.pause(0.01)

@@ -196,3 +196,10 @@ class CubicHermiteSpline:
         acceleration = np.sqrt(ax**2 + ay**2)
 
         return Pose(x, y, heading, velocity, acceleration)
+    
+
+
+
+    """
+    take derivative of step function: return matrix and act on that
+    """
