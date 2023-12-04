@@ -44,7 +44,6 @@ class KinematicBicycleModel:
 
         self.state = [self.x, self.y, self.theta, self.v, self.delta]
 
-
         return self.state
     
     def get_state(self):
@@ -98,23 +97,33 @@ class CurvilinearKinematicBicycleModel:
         self.e_y = 0
         self.e_psi = 0
 
-        self.state = [self.s, self.delta, self.vx, self.e_y, self.e_psi]
+        self.state = np.array([self.s, self.delta, self.vx, self.e_y, self.e_psi])
+
+    def updateState(self):
+        self.state = np.array([self.s, self.delta, self.vx, self.e_y, self.e_psi])
 
     def linearize(self, nominal_state, nominal_ctrl, dt):
+        print("nominal ctrl", nominal_ctrl)
+
         nominal_state = np.array(nominal_state).copy()
         nominal_ctrl = np.array(nominal_ctrl).copy()
+        print("copied nominal ctrl", nominal_ctrl)
         epsilon = 1e-2
         # A = df/dx
-        A = np.zeros((self.n, self.n), dtype=float)
+        A = np.zeros((5, 5), dtype=float)
         # find A
-        for i in range(self.n):
+        for i in range(5):
             # d x / d x_i, ith row in A
             x_l = nominal_state.copy()
             x_l[i] -= epsilon
             x_post_l = self.propagate(x_l, nominal_ctrl, dt)
+            print("x_l", x_l)
+            print("x_post_l", x_post_l)
             x_r = nominal_state.copy()
             x_r[i] += epsilon
             x_post_r = self.propagate(x_r, nominal_ctrl, dt)
+            print("x_r", x_r)
+            print("x_post_r", x_post_r)
             A[:, i] += (x_post_r.flatten() - x_post_l.flatten()) / (2 * epsilon)
 
         # B = df/du
@@ -185,6 +194,8 @@ class CurvilinearKinematicBicycleModel:
         self.x = pose.x - self.e_y * np.sin(tan_angle)
         self.y = pose.y + self.e_y * np.cos(tan_angle)
 
+        self.state = np.array([self.s, self.delta, self.vx, self.e_y, self.e_psi])
+
         return self.state
 
     # step function but isolated from the system - uses a given state, control, and dt.
@@ -193,12 +204,13 @@ class CurvilinearKinematicBicycleModel:
         s, delta, vx, e_y, e_psi = state
         new_delta = control
 
-        delta_dot = (new_delta - delta) / dt
+        print(new_delta[0], delta)
+
+        delta_dot = (new_delta[0] - delta) / dt
+
+        print(delta)
 
         t = self.path.getTFromLength(s)
-        pose = self.path.getPoseAt(t)
-
-        dx, dy = self.path.getVelocity(t)
         rho = self.path.getCurvature(t)
 
 
@@ -213,4 +225,10 @@ class CurvilinearKinematicBicycleModel:
         e_psi += e_psi_dot * dt
         e_y += e_y_dot * dt
 
-        return [s, delta, vx, e_y, e_psi]
+        state = np.array([s, delta, vx, e_y, e_psi])
+
+
+        return state
+    
+    def getState(self):
+        return self.state
