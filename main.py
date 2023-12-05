@@ -51,12 +51,12 @@ try:
         A, b, d = cBicycleModel.linearize(state, control, dt)
 
         # define Q and R matrices
-        Q = np.array([[0, 0, 0, 0, 0], 
-                      [0, 1, 0, 0, 0], 
-                      [0, 0, 0, 0, 0], 
-                      [0, 0, 0, 1, 0], 
+        Q = np.array([[0, 0, 0, 0, 0],
+                      [0, 1, 0, 0, 0],
+                      [0, 0, 0, 0, 0],
+                      [0, 0, 0, 1, 0],
                       [0, 0, 0, 0, 1]])
-        R = np.array([[1]])
+        R = np.array([[1000]])
 
         # solve DARE
         x = la.solve_discrete_are(A, b, Q, R)
@@ -65,8 +65,7 @@ try:
         k = -(R + b.T @ x @ b)**-1 @ b.T @ x @ A
 
         # calculate control
-        steer = (k @ state)[0]
-        print(steer)
+        steer = (-k @ state)[0]
         control[0] = steer
         
         # limit control outputs
@@ -74,9 +73,17 @@ try:
             control[0] = np.pi/4
         elif (control[0] < -np.pi/4):
             control[0] = -np.pi/4
+
+        
+        y = A @ state + b @ control + d
+        print("y", y)
         
         # update state with new control input
         state = cBicycleModel.propagate(state, control, dt)
+
+
+        print("control", control)
+        print("state", state)
 
         # update model position on graph
         cBicycleModel.updatePosition(state)

@@ -70,28 +70,30 @@ class CurvilinearKinematicBicycleModel:
 
         nominal_state = np.array(nominal_state).copy()
         nominal_ctrl = np.array(nominal_ctrl).copy()
+
+        n = nominal_state.shape[0]
+        m = nominal_ctrl.shape[0]
+
         epsilon = 1e-2
         # A = df/dx
-        A = np.zeros((5, 5), dtype=float)
+        A = np.zeros((n, n), dtype=float)
         # find A
-        for i in range(5):
+        for i in range(n):
             # d x / d x_i, ith row in A
             x_l = nominal_state.copy()
             x_l[i] -= epsilon
             x_post_l = self.propagate(x_l, nominal_ctrl, dt)
-            # print("x_l", x_l)
-            # print("x_post_l", x_post_l)
+
             x_r = nominal_state.copy()
             x_r[i] += epsilon
             x_post_r = self.propagate(x_r, nominal_ctrl, dt)
-            # print("x_r", x_r)
-            # print("x_post_r", x_post_r)
+
             A[:, i] += (x_post_r.flatten() - x_post_l.flatten()) / (2 * epsilon)
 
         # B = df/du
-        B = np.zeros((5, 1), dtype=float)
+        B = np.zeros((n, m), dtype=float)
         # find B
-        for i in range(1):
+        for i in range(m):
             # d x / d u_i, ith row in B
             x0 = nominal_state.copy()
             u_l = nominal_ctrl.copy()
