@@ -2,6 +2,7 @@ import numpy as np
 
 from lib.path import CubicHermiteSpline, Pose
 
+# OLD CLASS THAT IS NOT CURVILINEAR: SEE FURTHER BELOW
 class KinematicBicycleModel:
 
     # state initialization: x, y, vehicle yaw, velocity
@@ -49,28 +50,8 @@ class KinematicBicycleModel:
     def get_state(self):
         return self.state
 
-"""
-Cartesian state: x, y, theta (yaw), v, delta (steer angle)
-Curvilinear: s (distance along curve), d (lateral displacement), delta (steer angle), heading error (difference between heading angle and angle of tangent line at s)
-
-"""
-
-def angle_between_heading_and_tangent(heading_angle, tangent_vector):
-    # Convert heading angle to unit vector
-    heading = (np.cos(heading_angle), np.sin(heading_angle))
-
-    # Normalize tangent vector
-    tangent_magnitude = np.sqrt(tangent_vector[0]**2 + tangent_vector[1]**2)
-    tangent = (tangent_vector[0] / tangent_magnitude, tangent_vector[1] / tangent_magnitude)
-
-    # Calculate dot product
-    dot_product = heading[0] * tangent[0] + heading[1] * tangent[1]
-
-    # Calculate angle in radians
-    angle_radians = np.arccos(dot_product)
 
 
-    return angle_radians
 
 class CurvilinearKinematicBicycleModel:
 
@@ -81,33 +62,14 @@ class CurvilinearKinematicBicycleModel:
         self.y = 0
         self.path = path
 
-        # longitudinal speed (along the curve)
-        self.vx = 0
-
-        # lateral speed (perpendicular to the curve)
-        self.vy = 0
-
         self.L = L
         self.Lf = L/2
         self.Lr = L/2
 
-        self.s = 0
-        self.delta = 0
-        self.theta = 0
-        self.e_y = 0
-        self.e_psi = 0
-
-        self.state = np.array([self.s, self.delta, self.vx, self.e_y, self.e_psi])
-
-    def updateState(self):
-        self.state = np.array([self.s, self.delta, self.vx, self.e_y, self.e_psi])
-
     def linearize(self, nominal_state, nominal_ctrl, dt):
-        print("nominal ctrl", nominal_ctrl)
 
         nominal_state = np.array(nominal_state).copy()
         nominal_ctrl = np.array(nominal_ctrl).copy()
-        print("copied nominal ctrl", nominal_ctrl)
         epsilon = 1e-2
         # A = df/dx
         A = np.zeros((5, 5), dtype=float)
@@ -117,13 +79,13 @@ class CurvilinearKinematicBicycleModel:
             x_l = nominal_state.copy()
             x_l[i] -= epsilon
             x_post_l = self.propagate(x_l, nominal_ctrl, dt)
-            print("x_l", x_l)
-            print("x_post_l", x_post_l)
+            # print("x_l", x_l)
+            # print("x_post_l", x_post_l)
             x_r = nominal_state.copy()
             x_r[i] += epsilon
             x_post_r = self.propagate(x_r, nominal_ctrl, dt)
-            print("x_r", x_r)
-            print("x_post_r", x_post_r)
+            # print("x_r", x_r)
+            # print("x_post_r", x_post_r)
             A[:, i] += (x_post_r.flatten() - x_post_l.flatten()) / (2 * epsilon)
 
         # B = df/du
@@ -154,65 +116,29 @@ class CurvilinearKinematicBicycleModel:
         d = x_post.flatten() - A @ x0 - B @ u0
         return A, B, d
 
-    
-    # delta_dot = change in steer angle with respect to time
-    # delta = steer angle
-    # theta = heading
-    # e_psi = heading error from tangent line
-    # e_psi_dot = change in heading error with respect to time
-    # s = distance along curve
-    # s_dot = change in distance along curve with respect to time
-    # e_y = lateral error from line tangent to closest point on curve
-    # e_y_dot = change in lateral error with respect to time
-    # rho = curvature of curve at closest point
-
-    def step(self, delta=0, dt=0.01):
-
-        delta_dot = (delta - self.delta) / dt
-
-        t = self.path.getTFromLength(self.s)
+    def updatePosition(self, state):
+        
+        t = self.path.getTFromLength(state[0])
         pose = self.path.getPoseAt(t)
 
         dx, dy = self.path.getVelocity(t)
-        rho = self.path.getCurvature(t)
-
-
-        s_dot =  1 / (1 - self.e_y * rho) * (self.vx - self.vx * self.delta * self.e_psi * self.Lr / (self.Lf + self.Lr))
-        e_psi_dot = self.vx * self.delta / (self.Lf + self.Lr) - rho * self.vx + delta_dot * self.Lr / (self.Lf + self.Lr)
-        e_y_dot = self.vx * self.delta * self.Lr / (self.Lf + self.Lr) + self.vx * self.e_psi
-
-        self.s += s_dot * dt
-
-        self.delta += delta_dot * dt
-
-        self.e_psi += e_psi_dot * dt
-        self.e_y += e_y_dot * dt
-
-        self.theta += e_psi_dot * dt
-
         tan_angle = np.arctan2(dy, dx)
-        self.x = pose.x - self.e_y * np.sin(tan_angle)
-        self.y = pose.y + self.e_y * np.cos(tan_angle)
-
-        self.state = np.array([self.s, self.delta, self.vx, self.e_y, self.e_psi])
-
-        return self.state
+        self.x = pose.x - state[4] * np.sin(tan_angle)
+        self.y = pose.y + state[4] * np.cos(tan_angle)
 
     # step function but isolated from the system - uses a given state, control, and dt.
     def propagate(self, state, control, dt=0.01):
 
-        s, delta, vx, e_y, e_psi = state
-        new_delta = control
+        copied_state = state.copy()
+        copied_control = control.copy()
 
-        print(new_delta[0], delta)
+        s, delta, vx, e_y, e_psi = copied_state
+        new_delta = copied_control[0]
 
-        delta_dot = (new_delta[0] - delta) / dt
-
-        print(delta)
+        delta_dot = (new_delta - delta) / dt
 
         t = self.path.getTFromLength(s)
         rho = self.path.getCurvature(t)
-
 
         s_dot =  1 / (1 - e_y * rho) * (vx - vx * delta * e_psi * self.Lr / (self.Lf + self.Lr))
         e_psi_dot = vx * delta / (self.Lf + self.Lr) - rho * vx + delta_dot * self.Lr / (self.Lf + self.Lr)
@@ -225,10 +151,4 @@ class CurvilinearKinematicBicycleModel:
         e_psi += e_psi_dot * dt
         e_y += e_y_dot * dt
 
-        state = np.array([s, delta, vx, e_y, e_psi])
-
-
-        return state
-    
-    def getState(self):
-        return self.state
+        return np.array([s, delta, vx, e_y, e_psi])

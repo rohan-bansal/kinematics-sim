@@ -62,10 +62,7 @@ class PurePursuitController:
 
 
     # t between 0 and 1
-    def step(self, plt, dt=0.01):
-        x = self.model.x
-        y = self.model.y
-        v = self.model.vx
+    def step(self, x, y, v, plt, dt=0.01):
         
         self.lookahead_distance = np.clip(self.LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
 

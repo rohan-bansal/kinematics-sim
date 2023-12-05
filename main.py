@@ -20,9 +20,8 @@ path = CubicHermiteSpline(waypoints)
 
 
 cBicycleModel = CurvilinearKinematicBicycleModel(path, L)
-cBicycleModel.vx = 5.
 
-controller = PurePursuitController(cBicycleModel, path)
+# controller = PurePursuitController(cBicycleModel, path)
 
 x_data = np.zeros_like(t_data)
 y_data = np.zeros_like(t_data)
@@ -33,7 +32,11 @@ model_y_data = []
 plt.title("Kinematic Bicycle Motion Model")
 plt.axis('equal')
 
-steer = 0.0001
+# steer = 0.0001
+# s, delta, vx, e_y, e_psi
+state = np.array([0, 0, 5., 0, 0])
+# steer
+control = [0.001]
 
 for i in range(t_data.shape[0]):
 
@@ -51,25 +54,11 @@ try:
         model_x_data.append(cBicycleModel.x)
         model_y_data.append(cBicycleModel.y)
 
-        cBicycleModel.updateState()
+        A, b, d = cBicycleModel.linearize(state, control, dt)
 
-
-        # steer = controller.step(plt)
-        state = cBicycleModel.state.copy()
-        print(state)
-
-        # new_state = [state[0], 0, state[2], 0, 0]
-        A, b, d = cBicycleModel.linearize(state, np.array([steer]), dt)
-        print(A, b, d)
-
-
-        # x = A @ state + b @ [steer] + d
-
-        # print(A, b, d)
-
-        Q = np.array([[1, 0, 0, 0, 0], 
+        Q = np.array([[0, 0, 0, 0, 0], 
                       [0, 1, 0, 0, 0], 
-                      [0, 0, 1, 0, 0], 
+                      [0, 0, 0, 0, 0], 
                       [0, 0, 0, 1, 0], 
                       [0, 0, 0, 0, 1]])
         R = np.array([[100]])
@@ -77,18 +66,18 @@ try:
         x = la.solve_discrete_are(A, b, Q, R)
         k = -(R + b.T @ x @ b)**-1 @ b.T @ x @ A
 
-        steer = k @ cBicycleModel.state
-        
-
-        if (steer[0] > np.pi/4):
-            steer[0] = np.pi/4
-        elif (steer[0] < -np.pi/4):
-            steer[0] = -np.pi/4
-        
-
+        steer = (k @ state)[0]
         print(steer)
+        control[0] = steer
+        
+        if (control[0] > np.pi/4):
+            control[0] = np.pi/4
+        elif (control[0] < -np.pi/4):
+            control[0] = -np.pi/4
+        
+        state = cBicycleModel.propagate(state, control, dt)
 
-        cBicycleModel.step(delta=steer[0], dt=dt)
+        cBicycleModel.updatePosition(state)
 
 
         plt.pause(0.01)
