@@ -58,8 +58,6 @@ class CurvilinearKinematicBicycleModel:
     # parameters: wheelbase 
     def __init__(self, path, L):
 
-        self.x = 0
-        self.y = 0
         self.path = path
 
         self.L = L
@@ -118,15 +116,18 @@ class CurvilinearKinematicBicycleModel:
         d = x_post.flatten() - A @ x0 - B @ u0
         return A, B, d
 
-    def updatePosition(self, state):
-        
-        t = self.path.getTFromLength(state[0])
+    def get_cartesian_position(self, curvilinear_state):
+        s = curvilinear_state[0]
+        d = curvilinear_state[3]
+        t = self.path.getTFromLength(s)
         pose = self.path.getPoseAt(t)
 
         dx, dy = self.path.getVelocity(t)
         tan_angle = np.arctan2(dy, dx)
-        self.x = pose.x - state[4] * np.sin(tan_angle)
-        self.y = pose.y + state[4] * np.cos(tan_angle)
+        x = pose.x - d * np.sin(tan_angle)
+        y = pose.y + d * np.cos(tan_angle)
+
+        return x, y
 
     # step function but isolated from the system - uses a given state, control, and dt.
     def propagate(self, state, control, dt=0.01):

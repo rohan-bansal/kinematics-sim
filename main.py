@@ -38,6 +38,18 @@ control = [0.001]
 for i in range(t_data.shape[0]):
     x_data[i], y_data[i] = path.getPosition(t_data[i])
 
+vx_0 = 5
+A0 = np.array([[1, 0, 0],
+               [vx_0 / L * dt, 1, 0],
+               [1/2 * vx_0 * dt, vx_0 * dt, 1]])
+B0 = np.array([[dt],
+               [1/2 * dt],
+               [0]])
+Q0 = np.eye(3)
+R0 = np.eye(1)
+P0 = la.solve_discrete_are(A0, B0, Q0, R0)
+K0 = -np.linalg.inv(R0 + B0.T @ P0 @ B0) @ B0.T @ P0 @ A0
+
 try:
     while True:
 
@@ -58,22 +70,25 @@ try:
                       [0, 0, 0, 0, 1]])
         R = np.array([[1000]])
 
-        # solve DARE
-        x = la.solve_discrete_are(A, b, Q, R)
-
-        # calculate K gain
-        k = -(R + b.T @ x @ b)**-1 @ b.T @ x @ A
+        # # solve DARE
+        # x = la.solve_discrete_are(A, b, Q, R)
+        #
+        # # calculate K gain
+        # k = -(R + b.T @ x @ b)**-1 @ b.T @ x @ A
 
         # calculate control
-        steer = (-k @ state)[0]
-        control[0] = steer
-        
-        # limit control outputs
-        if (control[0] > np.pi/4):
-            control[0] = np.pi/4
-        elif (control[0] < -np.pi/4):
-            control[0] = -np.pi/4
+        # steer = (-k @ state)[0]
+        # control[0] = steer
+        #
+        # # limit control outputs
+        # if (control[0] > np.pi/4):
+        #     control[0] = np.pi/4
+        # elif (control[0] < -np.pi/4):
+        #     control[0] = -np.pi/4
 
+        x0 = np.array([state[1], state[-1], state[-2]]).reshape((-1, 1))
+        delta_dot = K0 @ x0
+        control = (state[1] + delta_dot*dt).flatten()
         
         y = A @ state + b @ control + d
         print("y", y)
@@ -86,9 +101,9 @@ try:
         print("state", state)
 
         # update model position on graph
-        cBicycleModel.updatePosition(state)
-        model_x_data.append(cBicycleModel.x)
-        model_y_data.append(cBicycleModel.y)
+        x, y = cBicycleModel.get_cartesian_position(state)
+        model_x_data.append(x)
+        model_y_data.append(y)
 
 
         plt.pause(dt)
