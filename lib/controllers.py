@@ -23,6 +23,14 @@ class PIDController:
             self.prev_error = error
             return output
         
+        def testStep(self, measurement, dt):
+            error = self.setpoint - measurement
+            integral = self.integral
+            integral += error * dt
+            derivative = (error - self.prev_error) / dt
+            output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+            return output
+        
         def setSetpoint(self, setpoint):
             self.setpoint = setpoint
 

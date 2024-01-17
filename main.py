@@ -5,9 +5,11 @@ import scipy.linalg as la
 from lib.models import KinematicBicycleModel, CurvilinearKinematicBicycleModel
 from lib.path import CubicHermiteSpline, Pose
 from lib.controllers import PIDController, PurePursuitController
+from lib.filter import Particle, generate_uniform_particles
 
 dt = 0.01   
 L = 2 # 2m wheelbase
+vx = 5.
 
 t_data = np.arange(0, 1, dt)
 waypoints = [
@@ -19,6 +21,7 @@ waypoints = [
 
 path = CubicHermiteSpline(waypoints)
 cBicycleModel = CurvilinearKinematicBicycleModel(path, L)
+pidController = PIDController(1, 0, 0, vx)
 
 x_data = np.zeros_like(t_data)
 y_data = np.zeros_like(t_data)
@@ -29,26 +32,49 @@ plt.title("Kinematic Bicycle Motion Model")
 plt.axis('equal')
 
 # s, delta, vx, e_y, e_psi
-state = np.array([0, 0, 5., 0, 0])
-
-# steer
-control = [0.001]
+state = np.array([0, 0, vx, 0, 0])
 
 # draw predetermined path to follow on graph
 for i in range(t_data.shape[0]):
     x_data[i], y_data[i] = path.getPosition(t_data[i])
 
-vx_0 = 5
-A0 = np.array([[1, 0, 0],
-               [vx_0 / L * dt, 1, 0],
-               [1/2 * vx_0 * dt, vx_0 * dt, 1]])
-B0 = np.array([[dt],
-               [1/2 * dt],
-               [0]])
-Q0 = np.eye(3)
-R0 = np.eye(1)
-P0 = la.solve_discrete_are(A0, B0, Q0, R0)
-K0 = -np.linalg.inv(R0 + B0.T @ P0 @ B0) @ B0.T @ P0 @ A0
+def pfStep(measurement, parameterRange, numParticles):
+
+    # generate particles
+    particles = generate_uniform_particles(parameterRange, numParticles)
+
+    # predict particle next value using model (PID for velocity)
+    particlesPredictedVals = [pidController.testStep(particle.parameter, dt) for particle in particles]
+    
+    # update weights
+    for i in range(numParticles):
+
+        # based on gaussian distribution
+        likelihood = 1 / ((2 * 3.14159) ** 0.5) * 2.71828 ** (-0.5 * (abs(measurement - particlesPredictedVals[i])) ** 2)
+        particles[i].weight = likelihood
+
+        # particles[i].weight = np.exp(-0.5 * (measurement - particlesPredictedVals[i])**2)
+        # particles[i].weight = (measurement - particlesPredictedVals[i]) ** 2 + 1e-300 # add small number to avoid divide by zero
+
+    # normalize weights
+    weightSum = np.sum([particle.weight for particle in particles])
+    for i in range(numParticles):
+        particles[i].weight /= weightSum
+
+    fig, ax = plt.subplots()
+    ax.hist([particle.parameter for particle in particles], weights=[particle.weight for particle in particles])
+    fig.savefig("test.png")
+    plt.close(fig)
+
+    # resample particles
+
+
+    # estimate mean and variance
+    mean = np.average([particle.parameter for particle in particles], weights=[particle.weight for particle in particles])
+    variance = np.average([(particle.parameter - mean)**2 for particle in particles], weights=[particle.weight for particle in particles])
+
+    return mean, variance
+
 
 try:
     while True:
@@ -59,16 +85,66 @@ try:
         plt.plot(x_data, y_data, label="desired trajectory")
         plt.plot(model_x_data, model_y_data, label="model trajectory")
 
+        # run pf on measured velocity param of state
+        # output = pfStep(state[2], [2, 15], 100)
+        # print("FILTER OUTPUT", output)
+
+        # vx = output[0]
+        # state = np.array([state[0], state[1], vx, state[3], state[4]])
+        # print("STATE_PRE", state)
+        # pidController.setSetpoint(vx)
+        # pidController.step(
+        
+        state[2] = pidController.step()
+
+
+        A0 = np.array([[1, 0, 0],
+               [vx / L * dt, 1, 0],
+               [1/2 * vx * dt, vx * dt, 1]])
+        B0 = np.array([[dt],
+                    [1/2 * dt],
+                    [0]])
+        Q0 = np.eye(3)
+        R0 = np.eye(1)
+        P0 = la.solve_discrete_are(A0, B0, Q0, R0)
+        K0 = -np.linalg.inv(R0 + B0.T @ P0 @ B0) @ B0.T @ P0 @ A0
+
+
+        x0 = np.array([state[1], state[-1], state[-2]]).reshape((-1, 1))
+        delta_dot = K0 @ x0
+        control = (state[1] + delta_dot*dt).flatten()
+        
+        # update state with new control input
+        state = cBicycleModel.propagate(state, control, dt)
+        print(state)
+
+
+        # update model position on graph
+        x, y = cBicycleModel.get_cartesian_position(state)
+        model_x_data.append(x)
+        model_y_data.append(y)
+
+
+        plt.pause(dt)
+
+
+except KeyboardInterrupt:
+    pass
+
+
+
+
+
         # calculate A, b, d matrices with state and control
-        A, b, d = cBicycleModel.linearize(state, control, dt)
+        # A, b, d = cBicycleModel.linearize(state, control, dt)
 
         # define Q and R matrices
-        Q = np.array([[0, 0, 0, 0, 0],
-                      [0, 1, 0, 0, 0],
-                      [0, 0, 0, 0, 0],
-                      [0, 0, 0, 1, 0],
-                      [0, 0, 0, 0, 1]])
-        R = np.array([[1000]])
+        # Q = np.array([[0, 0, 0, 0, 0],
+        #               [0, 1, 0, 0, 0],
+        #               [0, 0, 0, 0, 0],
+        #               [0, 0, 0, 1, 0],
+        #               [0, 0, 0, 0, 1]])
+        # R = np.array([[1000]])
 
         # # solve DARE
         # x = la.solve_discrete_are(A, b, Q, R)
@@ -86,31 +162,5 @@ try:
         # elif (control[0] < -np.pi/4):
         #     control[0] = -np.pi/4
 
-        x0 = np.array([state[1], state[-1], state[-2]]).reshape((-1, 1))
-        delta_dot = K0 @ x0
-        control = (state[1] + delta_dot*dt).flatten()
-        
-        y = A @ state + b @ control + d
-        print("y", y)
-        
-        # update state with new control input
-        state = cBicycleModel.propagate(state, control, dt)
-
-
-        print("control", control)
-        print("state", state)
-
-        # update model position on graph
-        x, y = cBicycleModel.get_cartesian_position(state)
-        model_x_data.append(x)
-        model_y_data.append(y)
-
-
-        plt.pause(dt)
-
-
-except KeyboardInterrupt:
-    pass
-
-
-
+        # y = A @ state + b @ control + d
+        # print("y", y)
