@@ -9,7 +9,6 @@ from lib.filter import Particle, generate_uniform_particles
 
 dt = 0.01   
 L = 2 # 2m wheelbase
-vx = 5.
 
 t_data = np.arange(0, 1, dt)
 waypoints = [
@@ -21,7 +20,7 @@ waypoints = [
 
 path = CubicHermiteSpline(waypoints)
 cBicycleModel = CurvilinearKinematicBicycleModel(path, L)
-pidController = PIDController(1, 0, 0, vx)
+pidController = PIDController(0.5, 0.001, 0.01, 5)
 
 x_data = np.zeros_like(t_data)
 y_data = np.zeros_like(t_data)
@@ -32,16 +31,18 @@ plt.title("Kinematic Bicycle Motion Model")
 plt.axis('equal')
 
 # s, delta, vx, e_y, e_psi
-state = np.array([0, 0, vx, 0, 0])
+state = np.array([0, 0, 0.01, 0, 0])
 
 # draw predetermined path to follow on graph
 for i in range(t_data.shape[0]):
     x_data[i], y_data[i] = path.getPosition(t_data[i])
 
-def pfStep(measurement, parameterRange, numParticles):
+def pfInit(parameterRange, numParticles):
+    return generate_uniform_particles(parameterRange, numParticles)
 
-    # generate particles
-    particles = generate_uniform_particles(parameterRange, numParticles)
+def pfStep(measurement, particles):
+
+    numParticles = len(particles)
 
     # predict particle next value using model (PID for velocity)
     particlesPredictedVals = [pidController.testStep(particle.parameter, dt) for particle in particles]
@@ -61,10 +62,10 @@ def pfStep(measurement, parameterRange, numParticles):
     for i in range(numParticles):
         particles[i].weight /= weightSum
 
-    fig, ax = plt.subplots()
-    ax.hist([particle.parameter for particle in particles], weights=[particle.weight for particle in particles])
-    fig.savefig("test.png")
-    plt.close(fig)
+    # fig, ax = plt.subplots()
+    # ax.hist([particle.parameter for particle in particles], weights=[particle.weight for particle in particles])
+    # fig.savefig("test.png")
+    # plt.close(fig)
 
     # resample particles
 
@@ -77,6 +78,9 @@ def pfStep(measurement, parameterRange, numParticles):
 
 
 try:
+
+    particles = pfInit([2, 15], 100)
+
     while True:
 
         # clear plot
@@ -86,21 +90,19 @@ try:
         plt.plot(model_x_data, model_y_data, label="model trajectory")
 
         # run pf on measured velocity param of state
-        # output = pfStep(state[2], [2, 15], 100)
+        output = pfStep(state[2], particles)
+        print("MEASURED", state[2] / dt, "FILTER OUTPUT", output)
         # print("FILTER OUTPUT", output)
 
-        # vx = output[0]
-        # state = np.array([state[0], state[1], vx, state[3], state[4]])
-        # print("STATE_PRE", state)
-        # pidController.setSetpoint(vx)
-        # pidController.step(
+
         
-        state[2] = pidController.step()
+        acc = pidController.step(state[2], dt)
+        # print("acc", acc)
 
 
         A0 = np.array([[1, 0, 0],
-               [vx / L * dt, 1, 0],
-               [1/2 * vx * dt, vx * dt, 1]])
+               [state[2] / L * dt, 1, 0],
+               [1/2 * state[2] * dt, state[2] * dt, 1]])
         B0 = np.array([[dt],
                     [1/2 * dt],
                     [0]])
@@ -112,7 +114,7 @@ try:
 
         x0 = np.array([state[1], state[-1], state[-2]]).reshape((-1, 1))
         delta_dot = K0 @ x0
-        control = (state[1] + delta_dot*dt).flatten()
+        control = np.array([delta_dot[0, 0], acc])
         
         # update state with new control input
         state = cBicycleModel.propagate(state, control, dt)

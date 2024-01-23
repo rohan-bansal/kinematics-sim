@@ -11,7 +11,7 @@ class KinematicBicycleModel:
         self.v = 0
         self.x = x
         self.y = y
-        self.theta = 0
+        self.theta = np.pi
         self.beta = 0
         self.delta = 0
         self.L = L
@@ -46,6 +46,28 @@ class KinematicBicycleModel:
         self.state = [self.x, self.y, self.theta, self.v, self.delta]
 
         return self.state
+    
+    def simStep(self, a=0, delta=0, dt=0.01):
+
+        v = self.v
+        theta = self.theta
+        beta = self.beta
+        x = self.x
+        y = self.y
+
+        v += a * dt
+
+        theta_update = (v / self.L) * (np.cos(beta) * np.tan(delta))
+        x_update = v * np.cos(theta + beta)
+        y_update = v * np.sin(theta + beta)
+
+        theta += theta_update * dt
+        x += x_update * dt
+        y += y_update * dt
+
+        state = [x, y, theta, v, delta]
+
+        return state
     
     def get_state(self):
         return self.state
@@ -136,9 +158,9 @@ class CurvilinearKinematicBicycleModel:
         copied_control = control.copy()
 
         s, delta, vx, e_y, e_psi = copied_state
-        new_delta = copied_control[0]
+        delta_dot = copied_control[0]
+        accel = copied_control[1]
 
-        delta_dot = (new_delta - delta) / dt
 
         t = self.path.getTFromLength(s)
         rho = self.path.getCurvature(t)
@@ -153,5 +175,7 @@ class CurvilinearKinematicBicycleModel:
 
         e_psi += e_psi_dot * dt
         e_y += e_y_dot * dt
+
+        vx += accel * dt
 
         return np.array([s, delta, vx, e_y, e_psi])

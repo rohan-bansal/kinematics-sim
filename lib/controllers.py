@@ -17,18 +17,18 @@ class PIDController:
         
         def step(self, measurement, dt):
             error = self.setpoint - measurement
-            self.integral += error * dt
-            derivative = (error - self.prev_error) / dt
+            self.integral += error
+            derivative = (error - self.prev_error)
             output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
             self.prev_error = error
             return output
         
-        def testStep(self, measurement, dt):
-            error = self.setpoint - measurement
+        def simStep(self, Kp, Ki, Kd, setpoint, measurement, dt):
+            error = setpoint - measurement
             integral = self.integral
             integral += error * dt
             derivative = (error - self.prev_error) / dt
-            output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+            output = Kp * error + Ki * self.integral + Kd * derivative
             return output
         
         def setSetpoint(self, setpoint):
@@ -37,16 +37,15 @@ class PIDController:
 
 class PurePursuitController:
     
-    def __init__(self, model: CurvilinearKinematicBicycleModel, path: CubicHermiteSpline):
+    def __init__(self, model: CurvilinearKinematicBicycleModel, path: CubicHermiteSpline, LOOKAHEAD_CONSTANT=None):
         self.model = model
         self.path = path
 
-        self.LOOKAHEAD_CONSTANT = 0.4
+        self.LOOKAHEAD_CONSTANT = 0.35 if LOOKAHEAD_CONSTANT is None else LOOKAHEAD_CONSTANT
 
-        self.min_LD = 0.1
+        self.min_LD = 1
         self.max_LD = 20
         self.lookahead_distance = 0
-        self.steer_prev = 0
 
     def getLookaheadPoint(self, distanceTraveled, lookahead_distance):
         path_length = self.path.getLengthToT(1)
@@ -70,7 +69,7 @@ class PurePursuitController:
 
 
     # t between 0 and 1
-    def step(self, x, y, v, plt, dt=0.01):
+    def step(self, x, y, v, plt=None, dt=0.01):
         
         self.lookahead_distance = np.clip(self.LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
 
@@ -80,11 +79,25 @@ class PurePursuitController:
         distanceTraveled = self.path.getLengthToT(closest_t)
         lookaheadPoint = self.getLookaheadPoint(distanceTraveled, self.lookahead_distance)
 
-        plt.plot(lookaheadPoint[0], lookaheadPoint[1], 'ro')
+        if plt is not None:
+            plt.plot(closest_x, closest_y, 'ro')
 
         alpha = np.arctan2(lookaheadPoint[1], lookaheadPoint[0]) - np.arctan2(y, x)
         steer = np.arctan((2 * self.model.L * np.sin(alpha)) / self.lookahead_distance)
 
-        # print(steer)
+        return steer
+    
+    def simStep(self, x, y, v, LOOKAHEAD_CONSTANT, dt=0.01):
+        
+        lookahead_distance = np.clip(LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
+
+        closest_t, lat_error, closest_x, closest_y = self.path.closestPointOnCurve((x, y))
+
+
+        distanceTraveled = self.path.getLengthToT(closest_t)
+        lookaheadPoint = self.getLookaheadPoint(distanceTraveled, lookahead_distance)
+
+        alpha = np.arctan2(lookaheadPoint[1], lookaheadPoint[0]) - np.arctan2(y, x)
+        steer = np.arctan((2 * self.model.L * np.sin(alpha)) / lookahead_distance)
 
         return steer
