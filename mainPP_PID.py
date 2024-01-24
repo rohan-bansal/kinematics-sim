@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-from filterpy.monte_carlo import systematic_resample
+# from filterpy.monte_carlo import systematic_resample
 
 from lib.models import KinematicBicycleModel
 from lib.path import CubicHermiteSpline, Pose
@@ -26,6 +26,9 @@ bicycleModel = KinematicBicycleModel(0, 0, L)
 path = CubicHermiteSpline(waypoints)
 controller = PurePursuitController(bicycleModel, path)
 PID = PIDController(0.9, 0, 0, 5)
+
+# x, y, theta, v, delta
+state = [0, 0, np.pi/2, 0, 0]
 
 #################### PLOTTING ####################
 x_data = np.zeros_like(t_data)
@@ -55,13 +58,11 @@ def pfStep(measurement, particles, weights):
     predictedStates = np.empty((N, 5))
     predictedStates = np.apply_along_axis(simulateNextStep, 1, particles)
 
-
     # update weights
-    for i in range(len(measurement)):
+    # for i in range(len(predictedStates)):
 
-        dst = np.linalg.norm(predictedStates - measurement, axis=1)
-
-        weights *= scipy.stats.norm(dst, 0.1).pdf(measurement[i])
+        # dst = np.linalg.norm(predictedStates - measurement, axis=1)
+    weights *= scipy.stats.multivariate_normal(measurement, 0.1).pdf(predictedStates)
 
     # normalize weights
     weights += 1.e-300
@@ -86,7 +87,6 @@ def simulateNextStep(particle):
     steer_angle = controller.simStep(bicycleModel.x, bicycleModel.y, bicycleModel.v, particle[4])
     PIDoutput = PID.simStep(particle[0], particle[1], particle[2], particle[3], bicycleModel.get_state()[3], dt)
     state = bicycleModel.simStep(a=PIDoutput, delta=steer_angle, dt=dt)
-    # state = [0,0,0,0,0]
 
     return state
 

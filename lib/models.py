@@ -11,7 +11,7 @@ class KinematicBicycleModel:
         self.v = 0
         self.x = x
         self.y = y
-        self.theta = np.pi
+        self.theta = np.pi/2
         self.beta = 0
         self.delta = 0
         self.L = L
