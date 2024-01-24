@@ -28,7 +28,6 @@ controller = PurePursuitController(bicycleModel, path)
 PID = PIDController(0.9, 0, 0, 5)
 
 # x, y, theta, v, delta
-state = [0, 0, np.pi/2, 0, 0]
 
 #################### PLOTTING ####################
 x_data = np.zeros_like(t_data)
@@ -56,7 +55,7 @@ def generate_uniform_particles():
 def pfStep(measurement, particles, weights):
 
     predictedStates = np.empty((N, 5))
-    predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, state)
+    predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, measurement)
 
     # update weights
     weights *= scipy.stats.multivariate_normal(measurement, 0.1).pdf(predictedStates)
@@ -81,16 +80,12 @@ def pfStep(measurement, particles, weights):
 
 def simulateNextStep(particle, cur_state):
 
-
     steer_angle = controller.simStep(cur_state, particle[4])
     # simStep takes in Kp, Ki, Kd, setpoint, velocity measurement, dt
     PIDoutput = PID.simStep(particle[0], particle[1], particle[2], particle[3], cur_state[3], dt)
     pred_state = bicycleModel.step(cur_state, a=PIDoutput, delta=steer_angle, dt=dt)
 
     return pred_state
-
-particles = generate_uniform_particles()
-weights = np.ones(N) / N
 
 #################### PATH GENERATION ####################
 for i in range(t_data.shape[0]):
@@ -99,28 +94,38 @@ for i in range(t_data.shape[0]):
 
 
 #################### MAIN LOOP ####################
-try:
-    while True:
+    
+def main():
+    particles = generate_uniform_particles()
+    weights = np.ones(N) / N
 
-        plt.clf()
-        plt.axis('equal')
-        plt.plot(x_data, y_data, label="desired trajectory")
-        plt.plot(model_x_data, model_y_data, label="model trajectory")
+    state = [0, 0, np.pi/2, 0, 0]
 
-        model_x_data.append(state[0])
-        model_y_data.append(state[1])
+    try:
+        while True:
 
-        steer_angle = controller.step(state[0], state[1], state[3], plt)
-        bicycleModel.delta = steer_angle
+            plt.clf()
+            plt.axis('equal')
+            plt.plot(x_data, y_data, label="desired trajectory")
+            plt.plot(model_x_data, model_y_data, label="model trajectory")
 
-        PIDoutput = PID.step(state[3], dt)
+            model_x_data.append(state[0])
+            model_y_data.append(state[1])
 
-        state = bicycleModel.step(state, a=PIDoutput, delta=steer_angle, dt=dt)
+            steer_angle = controller.step(state[0], state[1], state[3], plt)
+            bicycleModel.delta = steer_angle
 
-        mean, var = pfStep(state, particles, weights)
-        print("mean", mean, "var", var)
+            PIDoutput = PID.step(state[3], dt)
 
-        plt.pause(dt)
+            state = bicycleModel.step(state, a=PIDoutput, delta=steer_angle, dt=dt)
 
-except KeyboardInterrupt:
-    pass
+            mean, var = pfStep(state, particles, weights)
+            print("mean", mean, "var", var)
+
+            plt.pause(dt)
+
+    except KeyboardInterrupt:
+        pass
+
+if __name__ == '__main__':
+    main()
