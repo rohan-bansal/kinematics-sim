@@ -27,8 +27,6 @@ path = CubicHermiteSpline(waypoints)
 controller = PurePursuitController(bicycleModel, path)
 PID = PIDController(0.9, 0, 0, 5)
 
-# x, y, theta, v, delta
-
 #################### PLOTTING ####################
 x_data = np.zeros_like(t_data)
 y_data = np.zeros_like(t_data)
@@ -52,25 +50,24 @@ def generate_uniform_particles():
 
     return particles
 
-def pfStep(measurement, particles, weights):
+def pfStep(old_state, new_state, particles, weights):
 
     predictedStates = np.empty((N, 5))
-    predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, measurement)
+    predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, old_state)
 
     # update weights
-    weights *= scipy.stats.multivariate_normal(measurement, 0.1).pdf(predictedStates)
+    weights *= scipy.stats.multivariate_normal(new_state, 0.1).pdf(predictedStates)
 
     # normalize weights
     weights += 1.e-300
     weights /= sum(weights)
 
     # resample
-    if 1. / sum(weights**2) < N:
-        indexes = systematic_resample(weights)
-        particles[:] = particles[indexes]
-        weights[:] = weights[indexes]
-        weights.fill(1.0 / N)
-
+    # if 1. / sum(weights**2) < N:
+    #     indexes = systematic_resample(weights)
+    #     particles[:] = particles[indexes]
+    #     weights[:] = weights[indexes]
+    #     weights.fill(1.0 / N)
 
     # estimate mean and variance
     mean = np.average(particles, weights=weights, axis=0)
@@ -99,6 +96,7 @@ def main():
     particles = generate_uniform_particles()
     weights = np.ones(N) / N
 
+    # x, y, theta, v, delta
     state = [0, 0, np.pi/2, 0, 0]
 
     try:
@@ -117,10 +115,15 @@ def main():
 
             PIDoutput = PID.step(state[3], dt)
 
-            state = bicycleModel.step(state, a=PIDoutput, delta=steer_angle, dt=dt)
 
-            mean, var = pfStep(state, particles, weights)
+            old_state = state.copy()
+            state = bicycleModel.step(state, a=PIDoutput, delta=steer_angle, dt=dt)
+            new_state = state.copy()
+
+            mean, var = pfStep(old_state, new_state, particles, weights)
             print("mean", mean, "var", var)
+            # print("old state", old_state)
+            # print("new state", new_state)
 
             plt.pause(dt)
 
