@@ -26,8 +26,8 @@ class PIDController:
         def simStep(self, Kp, Ki, Kd, setpoint, measurement, dt):
             error = setpoint - measurement
             integral = self.integral
-            integral += error * dt
-            derivative = (error - self.prev_error) / dt
+            integral += error
+            derivative = (error - self.prev_error)
             output = Kp * error + Ki * self.integral + Kd * derivative
             return output
         
@@ -87,7 +87,11 @@ class PurePursuitController:
 
         return steer
     
-    def simStep(self, x, y, v, LOOKAHEAD_CONSTANT, dt=0.01):
+    def simStep(self, state, LOOKAHEAD_CONSTANT, dt=0.01):
+
+        x = state[0]
+        y = state[1]
+        v = state[3]
         
         lookahead_distance = np.clip(LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
 

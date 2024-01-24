@@ -59,9 +59,6 @@ def pfStep(measurement, particles, weights):
     predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, state)
 
     # update weights
-    # for i in range(len(predictedStates)):
-
-        # dst = np.linalg.norm(predictedStates - measurement, axis=1)
     weights *= scipy.stats.multivariate_normal(measurement, 0.1).pdf(predictedStates)
 
     # normalize weights
@@ -85,7 +82,8 @@ def pfStep(measurement, particles, weights):
 def simulateNextStep(particle, cur_state):
 
 
-    steer_angle = controller.simStep(cur_state[0], cur_state[1], cur_state[3], particle[4])
+    steer_angle = controller.simStep(cur_state, particle[4])
+    # simStep takes in Kp, Ki, Kd, setpoint, velocity measurement, dt
     PIDoutput = PID.simStep(particle[0], particle[1], particle[2], particle[3], cur_state[3], dt)
     pred_state = bicycleModel.step(cur_state, a=PIDoutput, delta=steer_angle, dt=dt)
 
@@ -122,7 +120,7 @@ try:
         mean, var = pfStep(state, particles, weights)
         print("mean", mean, "var", var)
 
-        plt.pause(0.01)
+        plt.pause(dt)
 
 except KeyboardInterrupt:
     pass
