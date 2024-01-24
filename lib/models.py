@@ -2,75 +2,37 @@ import numpy as np
 
 from lib.path import CubicHermiteSpline, Pose
 
-# OLD CLASS THAT IS NOT CURVILINEAR: SEE FURTHER BELOW
+# NOT CURVILINEAR: SEE FURTHER BELOW
 class KinematicBicycleModel:
 
     # state initialization: x, y, vehicle yaw, velocity
     # parameters: x, y, wheelbase 
-    def __init__(self, x, y, L):
-        self.v = 0
-        self.x = x
-        self.y = y
-        self.theta = np.pi/2
+    def __init__(self, L):
         self.beta = 0
-        self.delta = 0
         self.L = L
         self.Lf = L/2
 
-        self.max_w = np.pi/4
-
-        self.state = [self.x, self.y, self.theta, self.v, self.delta]
     
-    def step(self, a=0, w=0, dt=0.01):
+    def step(self, state, a=0, delta=0, dt=0.01):
 
-        if w > self.max_w:
-            w = self.max_w
-        elif w < -self.max_w:
-            w = -self.max_w
-
-        self.v += a * dt
-        self.w = w
-
-        theta_update = (self.v / self.L) * (np.cos(self.beta) * np.tan(self.delta))
-        x_update = self.v * np.cos(self.theta + self.beta)
-        y_update = self.v * np.sin(self.theta + self.beta)
-
-        self.beta = np.arctan(self.Lf * np.tan(self.delta) / self.L)
-
-        self.x += x_update * dt
-        self.y += y_update * dt
-        self.theta += theta_update * dt
-
-        self.delta += self.w * dt
-
-        self.state = [self.x, self.y, self.theta, self.v, self.delta]
-
-        return self.state
-    
-    def simStep(self, a=0, delta=0, dt=0.01):
-
-        v = self.v
-        theta = self.theta
-        beta = self.beta
-        x = self.x
-        y = self.y
+        v = state[3]
+        theta = state[2]
+        x = state[0]
+        y = state[1]
 
         v += a * dt
 
-        theta_update = (v / self.L) * (np.cos(beta) * np.tan(delta))
-        x_update = v * np.cos(theta + beta)
-        y_update = v * np.sin(theta + beta)
+        theta_update = (v / self.L) * (np.cos(self.beta) * np.tan(delta))
+        x_update = v * np.cos(theta + self.beta)
+        y_update = v * np.sin(theta + self.beta)
 
-        theta += theta_update * dt
+        self.beta = np.arctan(self.Lf * np.tan(delta) / self.L)
+
         x += x_update * dt
         y += y_update * dt
+        theta += theta_update * dt
 
-        state = [x, y, theta, v, delta]
-
-        return state
-    
-    def get_state(self):
-        return self.state
+        return [x, y, theta, v, delta]
 
 
 

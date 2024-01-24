@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-# from filterpy.monte_carlo import systematic_resample
+from filterpy.monte_carlo import systematic_resample
 
 from lib.models import KinematicBicycleModel
 from lib.path import CubicHermiteSpline, Pose
@@ -22,7 +22,7 @@ waypoints = [
 ]
 
 #################### CONTROLLERS ####################
-bicycleModel = KinematicBicycleModel(0, 0, L)
+bicycleModel = KinematicBicycleModel(L)
 path = CubicHermiteSpline(waypoints)
 controller = PurePursuitController(bicycleModel, path)
 PID = PIDController(0.9, 0, 0, 5)
@@ -56,7 +56,7 @@ def generate_uniform_particles():
 def pfStep(measurement, particles, weights):
 
     predictedStates = np.empty((N, 5))
-    predictedStates = np.apply_along_axis(simulateNextStep, 1, particles)
+    predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, state)
 
     # update weights
     # for i in range(len(predictedStates)):
@@ -82,13 +82,14 @@ def pfStep(measurement, particles, weights):
 
     return mean, var
 
-def simulateNextStep(particle):
+def simulateNextStep(particle, cur_state):
 
-    steer_angle = controller.simStep(bicycleModel.x, bicycleModel.y, bicycleModel.v, particle[4])
-    PIDoutput = PID.simStep(particle[0], particle[1], particle[2], particle[3], bicycleModel.get_state()[3], dt)
-    state = bicycleModel.simStep(a=PIDoutput, delta=steer_angle, dt=dt)
 
-    return state
+    steer_angle = controller.simStep(cur_state[0], cur_state[1], cur_state[3], particle[4])
+    PIDoutput = PID.simStep(particle[0], particle[1], particle[2], particle[3], cur_state[3], dt)
+    pred_state = bicycleModel.step(cur_state, a=PIDoutput, delta=steer_angle, dt=dt)
+
+    return pred_state
 
 particles = generate_uniform_particles()
 weights = np.ones(N) / N
@@ -108,18 +109,17 @@ try:
         plt.plot(x_data, y_data, label="desired trajectory")
         plt.plot(model_x_data, model_y_data, label="model trajectory")
 
-        model_x_data.append(bicycleModel.get_state()[0])
-        model_y_data.append(bicycleModel.get_state()[1])
+        model_x_data.append(state[0])
+        model_y_data.append(state[1])
 
-
-        steer_angle = controller.step(bicycleModel.x, bicycleModel.y, bicycleModel.v, plt)
+        steer_angle = controller.step(state[0], state[1], state[3], plt)
         bicycleModel.delta = steer_angle
 
-        PIDoutput = PID.step(bicycleModel.get_state()[3], dt)
+        PIDoutput = PID.step(state[3], dt)
 
-        bicycleModel.step(a=PIDoutput, dt=dt)
+        state = bicycleModel.step(state, a=PIDoutput, delta=steer_angle, dt=dt)
 
-        mean, var = pfStep(bicycleModel.get_state(), particles, weights)
+        mean, var = pfStep(state, particles, weights)
         print("mean", mean, "var", var)
 
         plt.pause(0.01)
