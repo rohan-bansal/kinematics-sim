@@ -33,9 +33,6 @@ y_data = np.zeros_like(t_data)
 model_x_data = []
 model_y_data = []
 
-plt.title("Kinematic Bicycle Motion Model")
-plt.axis('equal')
-
 #################### PARTICLE FILTER ####################
 N = 1000
 
@@ -99,18 +96,26 @@ def main():
     # x, y, theta, v, delta
     state = [0, 0, np.pi/2, 0, 0]
 
+    fig, axs = plt.subplots(3, 2)
+
+    i = 0
+
     try:
         while True:
 
-            plt.clf()
-            plt.axis('equal')
-            plt.plot(x_data, y_data, label="desired trajectory")
-            plt.plot(model_x_data, model_y_data, label="model trajectory")
+            i += 1
+
+            # plot vehicle trajectory
+            axs[2, 1].cla()
+            axs[2, 1].set_title("vehicle trajectory")
+            axs[2, 1].axis('equal')
+            axs[2, 1].plot(x_data, y_data, label="desired trajectory")
+            axs[2, 1].plot(model_x_data, model_y_data, label="model trajectory")
 
             model_x_data.append(state[0])
             model_y_data.append(state[1])
 
-            steer_angle = controller.step(state[0], state[1], state[3], plt)
+            steer_angle = controller.step(state[0], state[1], state[3], axs[2,1])
             bicycleModel.delta = steer_angle
 
             PIDoutput = PID.step(state[3], dt)
@@ -122,8 +127,20 @@ def main():
 
             mean, var = pfStep(old_state, new_state, particles, weights)
             print("mean", mean, "var", var)
-            # print("old state", old_state)
-            # print("new state", new_state)
+            
+            #plot mean vals over iterations, line plot
+
+            axs[0, 0].set_title("Kp")
+            axs[0, 0].plot(i, mean[0], 'ro')
+            axs[0, 1].set_title("Ki")
+            axs[0, 1].plot(i, mean[1], 'ro')
+            axs[1, 0].set_title("Kd")
+            axs[1, 0].plot(i, mean[2], 'ro')
+            axs[1, 1].set_title("target velocity")
+            axs[1, 1].plot(i, mean[3], 'ro')
+            axs[2, 0].set_title("lookahead scaling factor")
+            axs[2, 0].plot(i, mean[4], 'ro')
+            
 
             plt.pause(dt)
 
