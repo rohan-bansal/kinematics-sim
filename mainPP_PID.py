@@ -2,18 +2,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 from filterpy.monte_carlo import systematic_resample
+import time
 
 from lib.models import KinematicBicycleModel
 from lib.path import CubicHermiteSpline, Pose
 from lib.controllers import PIDController, PurePursuitController
 from lib.filter import Particle, generate_uniform_particles
 
+np.random.seed(0)
+
 #################### PARAMETERS ####################
-dt = 0.01   
+dt = 0.1
+d_s = 0.01
 L = 2 # 2m wheelbase
 
 #################### PATH DATA ####################
-t_data = np.arange(0, 1, dt)
+t_data = np.arange(0, 1, d_s)
 waypoints = [
     Pose(x=0, y=0, heading=np.pi/2, velocity=20), 
     Pose(x=10, y=10, heading=0, velocity=20), 
@@ -34,7 +38,8 @@ model_x_data = []
 model_y_data = []
 
 #################### PARTICLE FILTER ####################
-N = 1000
+N = 10000
+
 
 def generate_uniform_particles():
     # Kp, Ki, Kd, target velocity, lookahead scaling factor
@@ -53,7 +58,8 @@ def pfStep(old_state, new_state, particles, weights):
     predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, old_state)
 
     # update weights
-    weights *= scipy.stats.multivariate_normal(new_state, 0.1).pdf(predictedStates)
+    posterior = scipy.stats.multivariate_normal(new_state, 0.01).pdf(predictedStates)
+    weights = weights * posterior
 
     # normalize weights
     weights += 1.e-300
@@ -68,9 +74,10 @@ def pfStep(old_state, new_state, particles, weights):
 
     # estimate mean and variance
     mean = np.average(particles, weights=weights, axis=0)
-    var  = np.average((particles - mean)**2, weights=weights, axis=0)
+    var = np.average((particles - mean)**2, weights=weights, axis=0)
 
-    return mean, var
+    return mean, var, weights
+
 
 def simulateNextStep(particle, cur_state):
 
@@ -115,18 +122,24 @@ def main():
             model_x_data.append(state[0])
             model_y_data.append(state[1])
 
+            t0 = time.time()
             steer_angle = controller.step(state[0], state[1], state[3], axs[2,1])
             bicycleModel.delta = steer_angle
-
+            t1 = time.time()
             PIDoutput = PID.step(state[3], dt)
-
+            t2 = time.time()
 
             old_state = state.copy()
             state = bicycleModel.step(state, a=PIDoutput, delta=steer_angle, dt=dt)
+            t3 = time.time()
+            print(state)
             new_state = state.copy()
 
-            mean, var = pfStep(old_state, new_state, particles, weights)
+
+            mean, var, weights = pfStep(old_state, new_state, particles, weights)
+            t4 = time.time()
             print("mean", mean, "var", var)
+            print(t1 - t0, t2 - t1, t3 - t2, t4 - t3)
             
             #plot mean vals over iterations, line plot
 
@@ -146,6 +159,7 @@ def main():
 
     except KeyboardInterrupt:
         pass
+
 
 if __name__ == '__main__':
     main()
