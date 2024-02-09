@@ -32,7 +32,7 @@ class KinematicBicycleModel:
         y += y_update * dt
         theta += theta_update * dt
 
-        return [x, y, theta, v, delta]
+        return [x, y, theta, v, delta] 
 
 
 

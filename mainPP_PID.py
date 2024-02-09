@@ -7,7 +7,6 @@ import time
 from lib.models import KinematicBicycleModel
 from lib.path import CubicHermiteSpline, Pose
 from lib.controllers import PIDController, PurePursuitController
-from lib.filter import Particle, generate_uniform_particles
 
 np.random.seed(0)
 
@@ -83,7 +82,7 @@ def simulateNextStep(particle, cur_state):
 
     steer_angle = controller.simStep(cur_state, particle[4])
     # simStep takes in Kp, Ki, Kd, setpoint, velocity measurement, dt
-    PIDoutput = PID.simStep(particle[0], particle[1], particle[2], particle[3], cur_state[3], dt)
+    PIDoutput = PID.simStep(particle[0], particle[1], particle[2], particle[3], cur_state[3])
     pred_state = bicycleModel.step(cur_state, a=PIDoutput, delta=steer_angle, dt=dt)
 
     return pred_state
@@ -126,7 +125,7 @@ def main():
             steer_angle = controller.step(state[0], state[1], state[3], axs[2,1])
             bicycleModel.delta = steer_angle
             t1 = time.time()
-            PIDoutput = PID.step(state[3], dt)
+            PIDoutput = PID.step(state[3])
             t2 = time.time()
 
             old_state = state.copy()

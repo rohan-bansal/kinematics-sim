@@ -15,7 +15,7 @@ class PIDController:
             self.integral = 0
             self.prev_error = 0
         
-        def step(self, measurement, dt):
+        def step(self, measurement):
             error = self.setpoint - measurement
             self.integral += error
             derivative = (error - self.prev_error)
@@ -23,7 +23,7 @@ class PIDController:
             self.prev_error = error
             return output
         
-        def simStep(self, Kp, Ki, Kd, setpoint, measurement, dt):
+        def simStep(self, Kp, Ki, Kd, setpoint, measurement):
             error = setpoint - measurement
             integral = self.integral
             integral += error

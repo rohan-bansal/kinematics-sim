@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 class Pose:
     # heading is in radians
@@ -23,6 +24,17 @@ class CubicHermiteSpline:
         self.ITERATION_CONSTANT = 100
 
         self.initFromPoses(poses)
+
+        # for i in range(1000):
+        #     self.preComputedLengths[i] = self.getLengthToT(i/1000, preCompute=True)
+
+
+        self.preComputedLengths = np.zeros(1000)
+        self.x_vals = np.zeros(1000)
+        self.y_vals = np.zeros(1000)
+        
+        self.getLengthToT(0, preCompute=True)
+        self.closestPointOnCurve([0, 0], preCompute=True)
 
     def initFromPoses(self, poses: list[Pose]):
         self.spline = []
@@ -136,43 +148,63 @@ class CubicHermiteSpline:
 
         return (vx * ay - vy * ax) / (vx**2 + vy**2)**(3/2)
 
-    def closestPointOnCurve(self, otherPoint):
+    def closestPointOnCurve(self, otherPoint, preCompute=False):
 
-        min_distance = np.inf
-        min_t = 0
-        min_x = 0
-        min_y = 0
+        if preCompute:
 
-        for i in range(self.ITERATION_CONSTANT):
-            t = i/self.ITERATION_CONSTANT
-            x, y = self.getPosition(t)
-            distance = np.sqrt((x - otherPoint[0])**2 + (y - otherPoint[1])**2)
-            if distance < min_distance:
-                min_distance = distance
-                min_t = t
-                min_x = x
-                min_y = y
+            for i in range(1000):
+                t = i/1000
+                x, y = self.getPosition(t)
+                self.x_vals[i] = x
+                self.y_vals[i] = y
 
-        # print(min_t)
+            return ""
+        else:
 
-        return (min_t, min_distance, min_x, min_y)
+            distances = np.sqrt((self.x_vals - otherPoint[0])**2 + (self.y_vals - otherPoint[1])**2)
+
+            closest_index = np.argmin(distances)
+            closest_t = closest_index/1000
+            closest_x = self.x_vals[closest_index]
+            closest_y = self.y_vals[closest_index]
+            min_distance = distances[closest_index]
+
+            return closest_t, min_distance, closest_x, closest_y
+
     
-    def getLengthToT(self, t):
+    def getLengthToT(self, t, preCompute=False):
 
-        start = 0
-        end = t
+        if preCompute:
+            
+            for i in range(1000):
 
-        half = (end - start) / 2.0
-        avg = (start + end) / 2.0
-        length = 0
+                start = 0
+                end = i/1000
 
-        for coefficient in self.getGaussianCoefficients():
-            vx, vy = self.getVelocity(avg + half * coefficient[1])
-            mag = np.sqrt(vx**2 + vy**2)
-            length += coefficient[0] * mag
+                half = (end - start) / 2.0
+                avg = (start + end) / 2.0
+                length = 0
 
-        return length * half
-    
+                for coefficient in self.getGaussianCoefficients():
+                    vx, vy = self.getVelocity(avg + half * coefficient[1])
+                    mag = np.sqrt(vx**2 + vy**2)
+                    length += coefficient[0] * mag
+
+                self.preComputedLengths[i] = length
+
+            return ""
+
+        else:
+
+            start = 0
+            end = t
+
+
+            half = (end - start) / 2.0
+            avg = (start + end) / 2.0
+            
+            return self.preComputedLengths[int(t*100)] * half
+
     def getTFromLength(self, length):
         
         t = length / self.getLengthToT(1)
@@ -197,9 +229,3 @@ class CubicHermiteSpline:
 
         return Pose(x, y, heading, velocity, acceleration)
     
-
-
-
-    """
-    take derivative of step function: return matrix and act on that
-    """
