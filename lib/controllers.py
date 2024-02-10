@@ -1,7 +1,7 @@
 import numpy as np
 from lib.path import Pose, CubicHermiteSpline
 from lib.models import KinematicBicycleModel, CurvilinearKinematicBicycleModel
-
+import time
 
 class PIDController:
     
@@ -94,14 +94,13 @@ class PurePursuitController:
         v = state[3]
         
         lookahead_distance = np.clip(LOOKAHEAD_CONSTANT * v, self.min_LD, self.max_LD)
-
         closest_t, lat_error, closest_x, closest_y = self.path.closestPointOnCurve((x, y))
-
 
         distanceTraveled = self.path.getLengthToT(closest_t)
         lookaheadPoint = self.getLookaheadPoint(distanceTraveled, lookahead_distance)
 
         alpha = np.arctan2(lookaheadPoint[1], lookaheadPoint[0]) - np.arctan2(y, x)
         steer = np.arctan((2 * self.model.L * np.sin(alpha)) / lookahead_distance)
+
 
         return steer

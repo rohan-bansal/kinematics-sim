@@ -28,7 +28,7 @@ waypoints = [
 bicycleModel = KinematicBicycleModel(L)
 path = CubicHermiteSpline(waypoints)
 controller = PurePursuitController(bicycleModel, path)
-PID = PIDController(0.9, 0, 0, 5)
+PID = PIDController(0.9, 0.1, 0, 5)
 
 #################### PLOTTING ####################
 x_data = np.zeros_like(t_data)
@@ -56,6 +56,7 @@ def pfStep(old_state, new_state, particles, weights):
     predictedStates = np.empty((N, 5))
     predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, old_state)
 
+
     # update weights
     posterior = scipy.stats.multivariate_normal(new_state, 0.01).pdf(predictedStates)
     weights = weights * posterior
@@ -64,7 +65,7 @@ def pfStep(old_state, new_state, particles, weights):
     weights += 1.e-300
     weights /= sum(weights)
 
-    # resample
+    # # resample
     # if 1. / sum(weights**2) < N:
     #     indexes = systematic_resample(weights)
     #     particles[:] = particles[indexes]
@@ -84,6 +85,8 @@ def simulateNextStep(particle, cur_state):
     # simStep takes in Kp, Ki, Kd, setpoint, velocity measurement, dt
     PIDoutput = PID.simStep(particle[0], particle[1], particle[2], particle[3], cur_state[3])
     pred_state = bicycleModel.step(cur_state, a=PIDoutput, delta=steer_angle, dt=dt)
+
+    # print("SIM STEP", t2 - t1, t3 - t2, t4 - t3)
 
     return pred_state
 
@@ -131,13 +134,13 @@ def main():
             old_state = state.copy()
             state = bicycleModel.step(state, a=PIDoutput, delta=steer_angle, dt=dt)
             t3 = time.time()
-            print(state)
+            # print(state)
             new_state = state.copy()
 
 
             mean, var, weights = pfStep(old_state, new_state, particles, weights)
             t4 = time.time()
-            print("mean", mean, "var", var)
+            # print("mean", mean, "var", var)
             print(t1 - t0, t2 - t1, t3 - t2, t4 - t3)
             
             #plot mean vals over iterations, line plot

@@ -170,6 +170,21 @@ class CubicHermiteSpline:
             min_distance = distances[closest_index]
 
             return closest_t, min_distance, closest_x, closest_y
+        
+    def closestPointOnCurveVec(self, otherPoints):
+
+        dx = self.x_vals[:, np.newaxis] - otherPoints[:, 0]  # Broadcast subtraction
+        dy = self.y_vals[:, np.newaxis] - otherPoints[:, 1]
+
+        squared_distances = dx**2 + dy**2
+        closest_indices = np.argmin(squared_distances, axis=0)  # Find min along columns
+        closest_t = closest_indices / 1000
+
+        closest_x = self.x_vals[closest_indices]
+        closest_y = self.y_vals[closest_indices]
+        min_distances = squared_distances[closest_indices, range(len(closest_indices))]
+
+        return closest_t, min_distances, closest_x, closest_y
 
     
     def getLengthToT(self, t, preCompute=False):
