@@ -12,7 +12,7 @@ from lib.controllers import PIDController
 np.random.seed(0)
 
 ################## PARAMETERS ##################
-dt = 0.1   
+dt = 0.05
 ds = 0.01
 L = 2
 
@@ -39,11 +39,11 @@ trajectory_ref = np.array([path.getPosition(t) for t in t_data])
 
 ################## MPC ##################
 
-predHorizon = 10
+predHorizon = 20
 Q_mpc = np.diag([1, 1, 1])
 R_mpc = np.diag([1])
 
-min_delta, max_delta = -3, 3
+min_delta, max_delta = -np.pi/4, np.pi/4
 max_delta_rate = 1
 min_acc, max_acc = -2.0, 2.0
 
@@ -56,7 +56,7 @@ def initMPC(state):
 x_prev = np.array([0, 0, 0])
 
 def mpcStep(measured_state):
-
+    x_0 = np.hstack((measured_state[1], measured_state[4], measured_state[3]))
     A = np.array([[1, 0, 0],
                 [measured_state[2] / L * dt, 1, 0],
                 [1/2 * measured_state[2] * dt, measured_state[2] * dt, 1]])
@@ -72,6 +72,7 @@ def mpcStep(measured_state):
     cost = 0.0
     constraints = []
 
+    constraints += [x[:, 0] == x_0]
     for t in range(predHorizon):
         cost += cp.quad_form(u[:, t], R_mpc)
 
@@ -121,9 +122,9 @@ def main():
         
             u = mpcStep(state)
             
-            print(u[0][1])
+            print(u[0][0])
 
-            control = [u[0][1], acc]
+            control = [u[0][0], acc]
 
             # print(control)
             
