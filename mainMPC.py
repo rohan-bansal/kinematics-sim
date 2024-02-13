@@ -19,10 +19,10 @@ L = 2
 ################## PATH DATA ##################
 t_data = np.arange(0, 1, ds)
 waypoints = [
-    Pose(x=0, y=0, heading=0, velocity=20), 
-    Pose(x=10, y=10, heading=0, velocity=20), 
-    Pose(x=20, y=20, heading=0, velocity=20),
-    Pose(x=30, y=30, heading=0, velocity=20)
+    Pose(x=0, y=0, heading=0, velocity=50), 
+    Pose(x=50, y=-50, heading=0, velocity=50), 
+    # Pose(x=20, y=20, heading=0, velocity=20),
+    # Pose(x=30, y=30, heading=0, velocity=20)
 ]
 
 ################## CONTROLLERS ##################
@@ -43,13 +43,17 @@ predHorizon = 10
 Q_mpc = np.diag([1, 1, 1])
 R_mpc = np.diag([1])
 
-min_delta, max_delta = -0.5, 0.5
+min_delta, max_delta = -3, 3
+max_delta_rate = 1
 min_acc, max_acc = -2.0, 2.0
 
 def initMPC(state):
     initial_state = np.array(state)
 
     return initial_state
+
+
+x_prev = np.array([0, 0, 0])
 
 def mpcStep(measured_state):
 
@@ -59,8 +63,8 @@ def mpcStep(measured_state):
     B = np.array([[dt],
                 [1/2 * dt],
                 [0]])
-
-    x_ref = np.array([measured_state[1], measured_state[-1], measured_state[-2]])
+    
+    x_ref = np.array([0, 0, 0])
 
     x = cp.Variable((3, predHorizon + 1))
     u = cp.Variable((1, predHorizon))
@@ -75,11 +79,15 @@ def mpcStep(measured_state):
             cost += cp.quad_form(x[:, t] - x_ref, Q_mpc)
 
         constraints += [x[:, t + 1] == A @ x[:, t] + B @ u[:, t]]
+                    
 
     constraints += [min_delta <= u, u <= max_delta]
 
     problem = cp.Problem(cp.Minimize(cost), constraints)
     problem.solve()
+
+    delta_mpc = np.array(u.value[0, :]).flatten()
+    print(delta_mpc)
 
     return u.value
     
@@ -111,11 +119,13 @@ def main():
             
             acc = pidController.step(state[2])
         
-            control_delta = mpcStep(state)
+            u = mpcStep(state)
             
-            print(control_delta)
+            print(u[0][1])
 
-            control = [control_delta[0][0], acc]
+            control = [u[0][1], acc]
+
+            # print(control)
             
             state = cBicycleModel.propagate(state, control, dt)
 

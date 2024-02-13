@@ -189,6 +189,7 @@ def main():
 
             control = np.array([delta_dot[0, 0], acc])
             
+            print(control)
             old_state = state.copy()
             state = cBicycleModel.propagate(state, control, dt)
             new_state = state.copy()
