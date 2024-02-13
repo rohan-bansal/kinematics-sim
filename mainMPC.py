@@ -19,10 +19,10 @@ L = 2
 ################## PATH DATA ##################
 t_data = np.arange(0, 1, ds)
 waypoints = [
-    Pose(x=0, y=0, heading=0, velocity=50), 
-    Pose(x=50, y=-50, heading=0, velocity=50), 
-    # Pose(x=20, y=20, heading=0, velocity=20),
-    # Pose(x=30, y=30, heading=0, velocity=20)
+    Pose(x=0, y=0, heading=0, velocity=20), 
+    Pose(x=10, y=10, heading=0, velocity=20), 
+    Pose(x=20, y=20, heading=0, velocity=20),
+    Pose(x=30, y=30, heading=0, velocity=20)
 ]
 
 ################## CONTROLLERS ##################
@@ -44,14 +44,6 @@ Q_mpc = np.diag([1, 1, 1])
 R_mpc = np.diag([1])
 
 min_delta, max_delta = -np.pi/4, np.pi/4
-max_delta_rate = 1
-min_acc, max_acc = -2.0, 2.0
-
-def initMPC(state):
-    initial_state = np.array(state)
-
-    return initial_state
-
 
 x_prev = np.array([0, 0, 0])
 
@@ -122,8 +114,6 @@ def main():
         
             u = mpcStep(state)
             
-            print(u[0][0])
-
             control = [u[0][0], acc]
 
             # print(control)
