@@ -50,6 +50,12 @@ def generate_uniform_particles():
     particles[:, 6] = np.random.uniform(0, 1, size=N) # Q2
     particles[:, 7] = np.random.uniform(0, 1, size=N) # Q3
 
+    # particles = np.empty((N, 4))
+    # particles[:, 0] = np.random.uniform(0, 1, size=N) # R
+    # particles[:, 1] = np.random.uniform(0, 1, size=N) # Q1
+    # particles[:, 2] = np.random.uniform(0, 1, size=N) # Q2
+    # particles[:, 3] = np.random.uniform(0, 1, size=N) # Q3
+
     return particles
 
 def pfStep(old_state, new_state, particles, weights):
@@ -58,7 +64,7 @@ def pfStep(old_state, new_state, particles, weights):
     predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, old_state)
 
     # update weights
-    posterior = scipy.stats.multivariate_normal(new_state, 0.01).pdf(predictedStates)
+    posterior = scipy.stats.multivariate_normal(new_state, 0.005).pdf(predictedStates)
     weights = weights * posterior
 
     # normalize weights
@@ -83,6 +89,7 @@ def simulateNextStep(particle, cur_state):
     t1 = time.time()
 
     acc = pidController.simStep(particle[0], particle[1], particle[2], particle[3], cur_state[2])
+    # acc = pidController.simStep(0.5, 0.001, 0.01, 5, cur_state[2])
 
     t2 = time.time()
 
@@ -95,8 +102,8 @@ def simulateNextStep(particle, cur_state):
     Q0 = np.zeros((3, 3))
     R0 = np.zeros((1, 1))
     
-    np.fill_diagonal(Q0, [particle[5], particle[6], particle[7]])
-    np.fill_diagonal(R0, [particle[4]])
+    np.fill_diagonal(Q0, [particle[1], particle[2], particle[3]])
+    np.fill_diagonal(R0, [particle[0]])
 
     t3 = time.time()
 
@@ -116,7 +123,7 @@ def simulateNextStep(particle, cur_state):
 
     t6 = time.time()
 
-    print(t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5, "total: ", t6 - t1, " seconds")
+    # print(t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5, "total: ", t6 - t1, " seconds")
 
     return pred_state
 
@@ -134,6 +141,7 @@ def main():
 
     # s, delta, vx, e_y, e_psi
     state = np.array([0, 0, 0.01, 0, 0])
+    control = np.array([0.0, 0])
 
     fig, axs = plt.subplots(3, 3)
 
@@ -166,6 +174,9 @@ def main():
             B0 = np.array([[dt],
                         [1/2 * dt],
                         [0]])
+            
+            # A0, B0, d = cBicycleModel.linearize(state, control, dt)
+
             Q0 = np.eye(3)
             R0 = np.eye(1)
             P0 = la.solve_discrete_are(A0, B0, Q0, R0)
@@ -184,7 +195,7 @@ def main():
 
             t4 = time.time()
 
-            mean, var, weights = pfStep(old_state, new_state, particles, weights)
+            # mean, var, weights = pfStep(old_state, new_state, particles, weights)
 
             t5 = time.time()
 
@@ -192,22 +203,22 @@ def main():
 
             # print("STATE: ", state)
 
-            axs[0, 1].set_title("Kp")
-            axs[0, 1].plot(i, mean[0], 'ro')
-            axs[0, 2].set_title("Ki")
-            axs[0, 2].plot(i, mean[1], 'ro')
-            axs[1, 0].set_title("Kd")
-            axs[1, 0].plot(i, mean[2], 'ro')
-            axs[2, 0].set_title("target velocity")
-            axs[2, 0].plot(i, mean[3], 'ro')
-            axs[1, 1].set_title("R")
-            axs[1, 1].plot(i, mean[4], 'ro')
-            axs[1, 2].set_title("Q1")
-            axs[1, 2].plot(i, mean[5], 'ro')
-            axs[2, 1].set_title("Q2")
-            axs[2, 1].plot(i, mean[6], 'ro')
-            axs[2, 2].set_title("Q3")
-            axs[2, 2].plot(i, mean[7], 'ro')
+            # axs[0, 1].set_title("Kp")
+            # axs[0, 1].plot(i, mean[0], 'ro')
+            # axs[0, 2].set_title("Ki")
+            # axs[0, 2].plot(i, mean[1], 'ro')
+            # axs[1, 0].set_title("Kd")
+            # axs[1, 0].plot(i, mean[2], 'ro')
+            # axs[2, 0].set_title("target velocity")
+            # axs[2, 0].plot(i, mean[3], 'ro')
+            # axs[1, 1].set_title("R")
+            # axs[1, 1].plot(i, mean[4], 'ro')
+            # axs[1, 2].set_title("Q1")
+            # axs[1, 2].plot(i, mean[5], 'ro')
+            # axs[2, 1].set_title("Q2")
+            # axs[2, 1].plot(i, mean[6], 'ro')
+            # axs[2, 2].set_title("Q3")
+            # axs[2, 2].plot(i, mean[7], 'ro')
 
             plt.pause(dt)
 

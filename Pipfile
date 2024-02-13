@@ -8,6 +8,9 @@ numpy = "*"
 matplotlib = "*"
 scipy = "*"
 filterpy = "*"
+jax-metal = "*"
+ecos = "==2.0.5"
+cvxpy = "*"
 
 [dev-packages]
 
