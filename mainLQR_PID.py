@@ -18,7 +18,7 @@ L = 2
 ################## PATH DATA ##################
 t_data = np.arange(0, 1, ds)
 waypoints = [
-    Pose(x=0, y=0, heading=0, velocity=20), 
+    Pose(x=0, y=0, heading=0, velocity=50), 
     Pose(x=10, y=10, heading=0, velocity=20), 
     Pose(x=20, y=20, heading=0, velocity=20),
     Pose(x=30, y=30, heading=0, velocity=20)
