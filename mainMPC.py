@@ -79,8 +79,16 @@ class Main():
     
     def pf(self, old_state, new_state, particles, weights):
 
-        predictedStates = np.empty((self.N, 7))
-        predictedStates = np.apply_along_axis(self.sim_step, 1, particles, old_state)
+        predictedStates = np.empty((self.N, 5))
+
+        prob = self.mpc_pf_init(
+            old_state, 
+            particles[0, 0], 
+            np.diag([particles[0, 3], particles[0, 4], particles[0, 5], particles[0, 6]]), 
+            np.diag([particles[0, 1], particles[0, 2]]))
+
+        for i in range(self.N):
+            predictedStates[i, :] = self.sim_step(prob, particles[i, :], old_state)
 
         # update weights
         posterior = scipy.stats.multivariate_normal(new_state, 0.005).pdf(predictedStates)
@@ -96,11 +104,11 @@ class Main():
 
         return mean, var, weights
     
-    def sim_step(self, particle, cur_state):
+    def sim_step(self, prob, particle, cur_state):
 
-        delta, acc = self.mpc_osqp(
-            cur_state, 
-            particle[0], 
+        delta, acc = self.mpc_pf(
+            prob,
+            particle[0],
             Q=np.diag([particle[3], particle[4], particle[5], particle[6]]), 
             R=np.diag([particle[1], particle[2]])
         )
@@ -109,7 +117,76 @@ class Main():
 
         return self.cBicycleModel.propagate(cur_state, control, self.dt)
 
+    def mpc_pf_init(self, measured_state, target_vel, Q, R):
+
+        N = self.predHorizon
+        nx, nu = [4, 2]
+
+        umin = np.array([self.min_delta, self.min_acc])
+        umax = np.array([self.max_delta, self.max_acc])
+        xmin = np.array([-1*np.pi, -1*np.inf, -1*np.inf, 0])
+        xmax = np.array([np.pi, np.inf, np.inf, np.inf])
+        x0 = np.hstack((measured_state[1], measured_state[4], measured_state[3], measured_state[2]))
+        xr = np.array([0, 0, 0, target_vel])
+
+        QN = Q
+
+        q = np.hstack([np.kron(np.ones(N), -1 * Q.dot(xr)), -1 * QN.dot(xr),
+                    np.zeros(N*nu)])
+
+        Ad = np.array([[1, 0, 0, 0],
+                    [measured_state[2] / self.L * self.dt, 1, 0, 0],
+                    [1/2 * measured_state[2] * self.dt, measured_state[2] * self.dt, 1, 0],
+                    [0, 0, 0, 1]])
+        Bd = np.array([[self.dt, 0],
+                    [1/2 * self.dt, 0],
+                    [0, 0],
+                    [0, self.dt]])
+
+        P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), QN,
+                            sparse.kron(sparse.eye(N), R)], format='csc')
+
+        Aineq = sparse.eye((N+1)*nx + N*nu)
+        lineq = np.hstack([np.kron(np.ones(N + 1), xmin), np.kron(np.ones(N), umin)])
+        uineq = np.hstack([np.kron(np.ones(N + 1), xmax), np.kron(np.ones(N), umax)])
+
+        Ax = sparse.kron(sparse.eye(N+1),-sparse.eye(nx)) + sparse.kron(sparse.eye(N+1, k=-1), Ad)
+        Bu = sparse.kron(sparse.vstack([sparse.csc_matrix((1, N)), sparse.eye(N)]), Bd)
+        Aeq = sparse.hstack([Ax, Bu])
+        leq = np.hstack([-x0, np.zeros(N*nx)])
+        ueq = leq
+
+        A = sparse.vstack([Aeq, Aineq], format='csc')
+        l = np.hstack([leq, lineq])
+        u = np.hstack([ueq, uineq])
+
+        prob = osqp.OSQP()
+        prob.setup(P, q, A, l, u, warm_start=True, verbose=False)
+        
+        return prob
     
+    def mpc_pf(self, prob, target_vel, Q, R):
+
+        N = self.predHorizon
+        nx, nu = [4, 2]
+
+        xr = np.array([0, 0, 0, target_vel])
+        QN = Q
+
+        q = np.hstack([np.kron(np.ones(N), -1 * Q.dot(xr)), -1 * QN.dot(xr),
+                np.zeros(N*nu)])
+        
+        P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), QN,
+                sparse.kron(sparse.eye(N), R)], format='csc')
+        
+        prob.update(q=q, Px=P)
+        res = prob.solve()
+
+        us = res.x[(N+1)*nx:]
+        delta_opt, acc_opt = us[:nu]
+
+        return delta_opt, acc_opt
+
     def mpc_osqp(self, measured_state, target_vel, Q=None, R=None):
 
         N = self.predHorizon
@@ -129,7 +206,6 @@ class Main():
 
         QN = Q
 
-        # - quadratic objective
         P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), QN,
                             sparse.kron(sparse.eye(N), R)], format='csc')
 
@@ -151,10 +227,11 @@ class Main():
         Aeq = sparse.hstack([Ax, Bu])
         leq = np.hstack([-x0, np.zeros(N*nx)])
         ueq = leq
-        # - input and state constraints
+
         Aineq = sparse.eye((N+1)*nx + N*nu)
         lineq = np.hstack([np.kron(np.ones(N + 1), xmin), np.kron(np.ones(N), umin)])
         uineq = np.hstack([np.kron(np.ones(N + 1), xmax), np.kron(np.ones(N), umax)])
+
         # - OSQP constraints
         A = sparse.vstack([Aeq, Aineq], format='csc')
         l = np.hstack([leq, lineq])
@@ -188,7 +265,6 @@ class Main():
         self.model_x_data.append(x)
         self.model_y_data.append(y)
 
-        print(state)
         delta, acc = self.mpc_osqp(state, self.target_velocity)
 
         control = [delta, acc] 

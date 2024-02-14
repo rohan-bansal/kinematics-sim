@@ -60,7 +60,7 @@ def generate_uniform_particles():
 
 def pfStep(old_state, new_state, particles, weights):
 
-    predictedStates = np.empty((N, 8))
+    predictedStates = np.empty((N, 5))
     predictedStates = np.apply_along_axis(simulateNextStep, 1, particles, old_state)
 
     # update weights
@@ -196,7 +196,7 @@ def main():
 
             t4 = time.time()
 
-            # mean, var, weights = pfStep(old_state, new_state, particles, weights)
+            mean, var, weights = pfStep(old_state, new_state, particles, weights)
 
             t5 = time.time()
 
@@ -204,22 +204,22 @@ def main():
 
             # print("STATE: ", state)
 
-            # axs[0, 1].set_title("Kp")
-            # axs[0, 1].plot(i, mean[0], 'ro')
-            # axs[0, 2].set_title("Ki")
-            # axs[0, 2].plot(i, mean[1], 'ro')
-            # axs[1, 0].set_title("Kd")
-            # axs[1, 0].plot(i, mean[2], 'ro')
-            # axs[2, 0].set_title("target velocity")
-            # axs[2, 0].plot(i, mean[3], 'ro')
-            # axs[1, 1].set_title("R")
-            # axs[1, 1].plot(i, mean[4], 'ro')
-            # axs[1, 2].set_title("Q1")
-            # axs[1, 2].plot(i, mean[5], 'ro')
-            # axs[2, 1].set_title("Q2")
-            # axs[2, 1].plot(i, mean[6], 'ro')
-            # axs[2, 2].set_title("Q3")
-            # axs[2, 2].plot(i, mean[7], 'ro')
+            axs[0, 1].set_title("Kp")
+            axs[0, 1].plot(i, mean[0], 'ro')
+            axs[0, 2].set_title("Ki")
+            axs[0, 2].plot(i, mean[1], 'ro')
+            axs[1, 0].set_title("Kd")
+            axs[1, 0].plot(i, mean[2], 'ro')
+            axs[2, 0].set_title("target velocity")
+            axs[2, 0].plot(i, mean[3], 'ro')
+            axs[1, 1].set_title("R")
+            axs[1, 1].plot(i, mean[4], 'ro')
+            axs[1, 2].set_title("Q1")
+            axs[1, 2].plot(i, mean[5], 'ro')
+            axs[2, 1].set_title("Q2")
+            axs[2, 1].plot(i, mean[6], 'ro')
+            axs[2, 2].set_title("Q3")
+            axs[2, 2].plot(i, mean[7], 'ro')
 
             plt.pause(dt)
 
