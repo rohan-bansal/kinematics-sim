@@ -29,7 +29,7 @@ class Main():
 
         t_data = np.arange(0, 1, self.ds)
         waypoints = [
-            Pose(x=0, y=0, heading=0, velocity=50), 
+            Pose(x=0, y=0, heading=0, velocity=30),
             Pose(x=10, y=10, heading=0, velocity=20), 
             Pose(x=20, y=20, heading=0, velocity=20),
             Pose(x=30, y=30, heading=0, velocity=20)
@@ -53,7 +53,7 @@ class Main():
         self.predHorizon = 20
         self.Q_mpc = np.diag([1, 1, 1, 1])
         self.R_mpc = np.diag([1, 1])
-        self.min_delta, self.max_delta = -np.pi/4, np.pi/4
+        self.min_delta, self.max_delta = -np.pi/2, np.pi/2
         self.min_acc, self.max_acc = -2, 2
 
         ################## STATE ##################
@@ -98,17 +98,19 @@ class Main():
     
     def mpc_osqp(self, measured_state, target_vel):
 
-        N = 20
+        N = self.predHorizon
+        nx, nu = [4, 2]
 
         umin = np.array([self.min_delta, self.min_acc])
         umax = np.array([self.max_delta, self.max_acc])
-        x0 = np.array([0, 0, 0, 0])
+        xmin = np.array([-1*np.pi, -1*np.inf, -1*np.inf, 0])
+        xmax = np.array([np.pi, np.inf, np.inf, np.inf])
+        x0 = np.hstack((measured_state[1], measured_state[4], measured_state[3], measured_state[2]))
         xr = np.array([0, 0, 0, target_vel])
 
-        Q = sparse.eye(4)
-        R = sparse.eye(2) * 0.01
+        Q = sparse.diags([0.01, 1.0, 1.0, 1.0])
+        R = sparse.diags([0.01, 1.0])
 
-        nx, nu = [4, 2]
         QN = Q
 
         # - quadratic objective
@@ -135,24 +137,24 @@ class Main():
         ueq = leq
         # - input and state constraints
         Aineq = sparse.eye((N+1)*nx + N*nu)
-        lineq = np.hstack([np.kron(np.ones(N), umin)])
-        uineq = np.hstack([np.kron(np.ones(N), umax)])
+        lineq = np.hstack([np.kron(np.ones(N + 1), xmin), np.kron(np.ones(N), umin)])
+        uineq = np.hstack([np.kron(np.ones(N + 1), xmax), np.kron(np.ones(N), umax)])
         # - OSQP constraints
         A = sparse.vstack([Aeq, Aineq], format='csc')
-        l = np.hstack([lineq])
+        l = np.hstack([leq, lineq])
         u = np.hstack([ueq, uineq])
 
 
         prob = osqp.OSQP()
-        prob.setup(P, q, A, l, u, warm_start=True)
+        prob.setup(P, q, A, l, u, warm_start=True, verbose=False)
 
         res = prob.solve()
 
-        print(res.x)
+        # print(res.x)
 
-        u = res.x
+        us = res.x[(N+1)*nx:]
 
-        delta_opt, acc_opt = u[:2]
+        delta_opt, acc_opt = us[:nu]
         print(delta_opt, acc_opt)
 
         return delta_opt, acc_opt
@@ -171,7 +173,8 @@ class Main():
         x, y, end = self.cBicycleModel.get_cartesian_position(state)
         self.model_x_data.append(x)
         self.model_y_data.append(y)
-        
+
+        print(state)
         delta, acc = self.mpc_osqp(state, 5)
         # self.mpc_osqp(state, 5)
         control = [delta, acc] 
