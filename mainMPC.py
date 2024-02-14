@@ -29,7 +29,7 @@ class Main():
 
         t_data = np.arange(0, 1, self.ds)
         waypoints = [
-            Pose(x=0, y=0, heading=0, velocity=30),
+            Pose(x=0, y=0, heading=0, velocity=50),
             Pose(x=10, y=10, heading=0, velocity=20), 
             Pose(x=20, y=20, heading=0, velocity=20),
             Pose(x=30, y=30, heading=0, velocity=20)
@@ -53,7 +53,7 @@ class Main():
         self.predHorizon = 20
         self.Q_mpc = np.diag([1, 1, 1, 1])
         self.R_mpc = np.diag([1, 1])
-        self.min_delta, self.max_delta = -np.pi/2, np.pi/2
+        self.min_delta, self.max_delta = -np.pi, np.pi
         self.min_acc, self.max_acc = -2, 2
 
         ################## STATE ##################
