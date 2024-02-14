@@ -106,12 +106,16 @@ class CurvilinearKinematicBicycleModel:
         t = self.path.getTFromLength(s)
         pose = self.path.getPoseAt(t)
 
+        atEnd = False
+        if((1 - t) < 0.0001):
+            atEnd = True
+
         dx, dy = self.path.getVelocity(t)
         tan_angle = np.arctan2(dy, dx)
         x = pose.x - d * np.sin(tan_angle)
         y = pose.y + d * np.cos(tan_angle)
 
-        return x, y
+        return x, y, atEnd
 
     # step function but isolated from the system - uses a given state, control, and dt.
     def propagate(self, state, control, dt=0.01):

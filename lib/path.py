@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from scipy.optimize import newton
 
 class Pose:
     # heading is in radians
@@ -221,16 +222,14 @@ class CubicHermiteSpline:
             return self.preComputedLengths[int(t*100)] * half
 
     def getTFromLength(self, length):
-        
-        t = length / self.getLengthToT(1)
 
-        for i in range(5):
-            deriv = self.getVelocity(t)
-            derivMag = np.sqrt(deriv[0]**2 + deriv[1]**2)
+        initial_t = length / self.getLengthToT(1)
 
-            if derivMag > 0:
-                t -= (self.getLengthToT(t) - length) / derivMag
-                t = np.min([np.max([t, 0]), 1])
+        length_difference = lambda t: self.getLengthToT(t) - length
+
+        t = newton(length_difference, initial_t)
+
+        t = np.min([np.max([t, 0]), 1])
 
         return t
         

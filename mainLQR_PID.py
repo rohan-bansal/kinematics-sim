@@ -158,7 +158,7 @@ def main():
             axs[0, 0].plot(x_data, y_data, label="desired trajectory")
             axs[0, 0].plot(model_x_data, model_y_data, label="model trajectory")
 
-            x, y = cBicycleModel.get_cartesian_position(state)
+            x, y, end = cBicycleModel.get_cartesian_position(state)
             model_x_data.append(x)
             model_y_data.append(y)
             
