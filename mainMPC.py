@@ -106,12 +106,15 @@ class Main():
     
     def sim_step(self, prob, particle, cur_state):
 
+        t0 = time.time()
         delta, acc = self.mpc_pf(
             prob,
             particle[0],
             Q=np.diag([particle[3], particle[4], particle[5], particle[6]]), 
             R=np.diag([particle[1], particle[2]])
         )
+        t1 = time.time()
+        # print(t1 - t0)
 
         control = [delta, acc]
 
@@ -166,7 +169,7 @@ class Main():
         return prob
     
     def mpc_pf(self, prob, target_vel, Q, R):
-
+        t0 = time.time()
         N = self.predHorizon
         nx, nu = [4, 2]
 
@@ -178,9 +181,20 @@ class Main():
         
         P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), QN,
                 sparse.kron(sparse.eye(N), R)], format='csc')
-        
+        P = sparse.triu(P).data
+        # Q_diag = np.diag(Q)
+        # Qs = np.tile(Q_diag, N)
+        # R_diag = np.diag(R)
+        # Rs = np.tile(R_diag, N)
+        # P = sparse.hstack((Qs, np.diag(QN), Rs))
+        # P = sparse.triu(P).data
+        t1 = time.time()
         prob.update(q=q, Px=P)
+        prob.update_settings(warm_start=True)
+        t2 = time.time()
         res = prob.solve()
+        t3 = time.time()
+        print(t1 - t0, t2 - t1, t3 - t2)
 
         us = res.x[(N+1)*nx:]
         delta_opt, acc_opt = us[:nu]
