@@ -66,29 +66,32 @@ class Main():
 
     def generate_uniform_particles(self):
         # Velocity Setpoint, R1, R2, Q1, Q2, Q3, Q4
+        eps = 1e-4
         particles = np.empty((self.N, 7))
-        particles[:, 0] = np.random.uniform(0, 30, size=self.N) # Velocity Setpoint
-        particles[:, 1] = np.random.uniform(0, 1, size=self.N) # R1
-        particles[:, 2] = np.random.uniform(0, 1, size=self.N) # R2
-        particles[:, 3] = np.random.uniform(0, 1, size=self.N) # Q1
-        particles[:, 4] = np.random.uniform(0, 1, size=self.N) # Q2
-        particles[:, 5] = np.random.uniform(0, 1, size=self.N) # Q3
-        particles[:, 6] = np.random.uniform(0, 1, size=self.N) # Q4
+        particles[:, 0] = np.random.uniform(5, 30, size=self.N) # Velocity Setpoint
+        particles[:, 1] = np.random.uniform(eps, 1, size=self.N) # R1
+        particles[:, 2] = np.random.uniform(eps, 1, size=self.N) # R2
+        particles[:, 3] = np.random.uniform(eps, 1, size=self.N) # Q1
+        particles[:, 4] = np.random.uniform(eps, 1, size=self.N) # Q2
+        particles[:, 5] = np.random.uniform(eps, 1, size=self.N) # Q3
+        particles[:, 6] = np.random.uniform(eps, 1, size=self.N) # Q4
 
         return particles
-    
+
     def pf(self, old_state, new_state, particles, weights):
 
         predictedStates = np.empty((self.N, 5))
 
         prob = self.mpc_pf_init(
-            old_state, 
-            particles[0, 0], 
-            np.diag([particles[0, 3], particles[0, 4], particles[0, 5], particles[0, 6]]), 
-            np.diag([particles[0, 1], particles[0, 2]]))
+            old_state,
+            particles[0, 0],
+            sparse.block_diag([particles[0, 3], particles[0, 4], particles[0, 5], particles[0, 6]]),
+            sparse.block_diag([particles[0, 1], particles[0, 2]]))
 
+        t0 = time.time()
         for i in range(self.N):
             predictedStates[i, :] = self.sim_step(prob, particles[i, :], old_state)
+        print(time.time() - t0)
 
         # update weights
         posterior = scipy.stats.multivariate_normal(new_state, 0.005).pdf(predictedStates)
@@ -110,15 +113,16 @@ class Main():
         delta, acc = self.mpc_pf(
             prob,
             particle[0],
-            Q=np.diag([particle[3], particle[4], particle[5], particle[6]]), 
-            R=np.diag([particle[1], particle[2]])
+            Q=sparse.block_diag([particle[3], particle[4], particle[5], particle[6]]),
+            R=sparse.block_diag([particle[1], particle[2]])
         )
         t1 = time.time()
-        # print(t1 - t0)
 
         control = [delta, acc]
-
-        return self.cBicycleModel.propagate(cur_state, control, self.dt)
+        x_plus = self.cBicycleModel.propagate(cur_state, control, self.dt)
+        t2 = time.time()
+        # print(t1 - t0, t2 - t1)
+        return x_plus
 
     def mpc_pf_init(self, measured_state, target_vel, Q, R):
 
@@ -146,8 +150,9 @@ class Main():
                     [0, 0],
                     [0, self.dt]])
 
-        P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), QN,
-                            sparse.kron(sparse.eye(N), R)], format='csc')
+        Qs = sparse.kron(sparse.eye(N), Q)
+        Rs = sparse.kron(sparse.eye(N), R, format='coo')
+        P = sparse.block_diag([Qs, QN, Rs], format='csc')
 
         Aineq = sparse.eye((N+1)*nx + N*nu)
         lineq = np.hstack([np.kron(np.ones(N + 1), xmin), np.kron(np.ones(N), umin)])
@@ -169,32 +174,36 @@ class Main():
         return prob
     
     def mpc_pf(self, prob, target_vel, Q, R):
-        t0 = time.time()
+        # t0 = time.time()
         N = self.predHorizon
         nx, nu = [4, 2]
 
         xr = np.array([0, 0, 0, target_vel])
         QN = Q
 
-        q = np.hstack([np.kron(np.ones(N), -1 * Q.dot(xr)), -1 * QN.dot(xr),
-                np.zeros(N*nu)])
-        
-        P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), QN,
-                sparse.kron(sparse.eye(N), R)], format='csc')
-        P = sparse.triu(P).data
-        # Q_diag = np.diag(Q)
-        # Qs = np.tile(Q_diag, N)
-        # R_diag = np.diag(R)
-        # Rs = np.tile(R_diag, N)
-        # P = sparse.hstack((Qs, np.diag(QN), Rs))
+        Qr = -1 * Q.dot(xr)
+        Qrs = np.tile(Qr, N)
+        q = np.hstack([Qrs, -1 * QN.dot(xr), np.zeros(N*nu)])
+
+        # Qs = sparse.kron(sparse.eye(N), Q)
+        # Rs = sparse.kron(sparse.eye(N), R, format='coo')
+        # P = sparse.block_diag([Qs, QN, Rs], format='csc')
+        # P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), QN,
+        #         sparse.kron(sparse.eye(N), R)], format='csc')
         # P = sparse.triu(P).data
-        t1 = time.time()
+        Q_diag = Q.data
+        Qs = np.tile(Q_diag, N)
+        R_diag = R.data
+        Rs = np.tile(R_diag, N)
+        P = np.hstack((Qs, QN.data, Rs))
+        # P = sparse.triu(P).data
+        # t1 = time.time()
         prob.update(q=q, Px=P)
-        prob.update_settings(warm_start=True)
-        t2 = time.time()
+        # prob.update_settings(warm_start=True)
+        # t2 = time.time()
         res = prob.solve()
-        t3 = time.time()
-        print(t1 - t0, t2 - t1, t3 - t2)
+        # t3 = time.time()
+        # print(t1 - t0, t2 - t1, t3 - t2)
 
         us = res.x[(N+1)*nx:]
         delta_opt, acc_opt = us[:nu]
