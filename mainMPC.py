@@ -3,6 +3,7 @@ import numpy as np
 import time
 import osqp
 from scipy import sparse
+from filterpy.monte_carlo import systematic_resample
 import scipy
 from filterpy.monte_carlo import systematic_resample
 
@@ -28,10 +29,10 @@ class Main():
 
         t_data = np.arange(0, 1, self.ds)
         waypoints = [
-            Pose(x=0, y=0, heading=0, velocity=20),
-            Pose(x=10, y=10, heading=0, velocity=20), 
-            Pose(x=20, y=20, heading=0, velocity=20),
-            Pose(x=30, y=30, heading=0, velocity=20)
+            Pose(x=0, y=0, heading=0, velocity=200),
+            Pose(x=100, y=100, heading=0, velocity=200), 
+            Pose(x=200, y=200, heading=0, velocity=200),
+            Pose(x=300, y=300, heading=0, velocity=200)
         ]
 
         self.path = CubicHermiteSpline(waypoints)
@@ -103,7 +104,7 @@ class Main():
         print(time.time() - t0)
 
         # update weights
-        posterior = scipy.stats.multivariate_normal(new_state, 0.005).pdf(predictedStates)
+        posterior = scipy.stats.multivariate_normal(new_state, 0.01).pdf(predictedStates)
         weights = weights * posterior
 
         # normalize weights
@@ -125,7 +126,32 @@ class Main():
         mean = np.average(particles, weights=weights, axis=0)
         var = np.average((particles - mean)**2, weights=weights, axis=0)
 
-        return mean, var, weights, particles
+        # get expected particle using weighted average
+        # expected_particle = np.average(particles, weights=weights, axis=0)
+        # print(expected_particle)
+
+        # horizon = self.mpc_osqp(
+        #     old_state, 
+        #     expected_particle[0], 
+        #     np.diag([expected_particle[3], expected_particle[4], expected_particle[5], expected_particle[6]]), 
+        #     np.diag([expected_particle[1], expected_particle[2]]), returnEntireHorizon=True)
+        
+        # forward_predicted_state = self.forward_predict(new_state, horizon)
+
+        # x, y = self.path.getPosition(self.path.getTFromLength(forward_predicted_state[0]))
+
+        # calculate actual - predicted here, graph
+
+
+        return mean, var, weights
+    
+    def forward_predict(self, cur_state, horizon_inputs):
+            
+        state = cur_state.copy()
+        for i in reversed(range(horizon_inputs.shape[0])):
+            state = self.cBicycleModel.propagate(state, horizon_inputs[i, :], self.dt)
+
+        return state
     
     def sim_step(self, prob, particle, cur_state):
 
@@ -230,7 +256,7 @@ class Main():
 
         return delta_opt, acc_opt
 
-    def mpc_osqp(self, measured_state, target_vel, Q=None, R=None):
+    def mpc_osqp(self, measured_state, target_vel, Q=None, R=None, returnEntireHorizon=False):
 
         N = self.predHorizon
         nx, nu = [4, 2]
@@ -285,6 +311,9 @@ class Main():
         prob.setup(P, q, A, l, u, warm_start=True, verbose=False)
 
         res = prob.solve()
+
+        if returnEntireHorizon:
+            return res.x
 
         us = res.x[(N+1)*nx:]
 
