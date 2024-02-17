@@ -318,17 +318,18 @@ class Main():
 
         mean, var, pf_weights, pf_particles = self.pf(old_state, new_state, pf_particles, pf_weights)
 
-        plot_weights = False
+        plot_weights = True
 
         self.axs[0, 1].set_title("target velocity")
         if plot_weights:
-            self.axs[0, 1].scatter([self.step_i]*self.N, pf_particles[:, 0], marker='o', c='r', alpha=weights)
-            self.axs[0, 2].scatter([self.step_i]*self.N, pf_particles[:, 1], marker='o', c='r', alpha=weights)
-            self.axs[1, 0].scatter([self.step_i] * self.N, pf_particles[:, 2], marker='o', c='r', alpha=weights)
-            self.axs[2, 0].scatter([self.step_i] * self.N, pf_particles[:, 3], marker='o', c='r', alpha=weights)
-            self.axs[1, 1].scatter([self.step_i] * self.N, pf_particles[:, 4], marker='o', c='r', alpha=weights)
-            self.axs[1, 2].scatter([self.step_i] * self.N, pf_particles[:, 5], marker='o', c='r', alpha=weights)
-            self.axs[2, 1].scatter([self.step_i] * self.N, pf_particles[:, 6], marker='o', c='r', alpha=weights)
+            if self.step_i % 5 == 0:
+                self.axs[0, 1].scatter([self.step_i]*self.N, pf_particles[:, 0], marker='o', c='r', alpha=weights)
+                self.axs[0, 2].scatter([self.step_i]*self.N, pf_particles[:, 1], marker='o', c='r', alpha=weights)
+                self.axs[1, 0].scatter([self.step_i] * self.N, pf_particles[:, 2], marker='o', c='r', alpha=weights)
+                self.axs[2, 0].scatter([self.step_i] * self.N, pf_particles[:, 3], marker='o', c='r', alpha=weights)
+                self.axs[1, 1].scatter([self.step_i] * self.N, pf_particles[:, 4], marker='o', c='r', alpha=weights)
+                self.axs[1, 2].scatter([self.step_i] * self.N, pf_particles[:, 5], marker='o', c='r', alpha=weights)
+                self.axs[2, 1].scatter([self.step_i] * self.N, pf_particles[:, 6], marker='o', c='r', alpha=weights)
         else:
             self.axs[0, 1].plot(self.step_i, mean[0], 'ro')
             self.axs[0, 2].plot(self.step_i, mean[1], 'ro')
@@ -337,19 +338,20 @@ class Main():
             self.axs[1, 1].plot(self.step_i, mean[4], 'ro')
             self.axs[1, 2].plot(self.step_i, mean[5], 'ro')
             self.axs[2, 1].plot(self.step_i, mean[6], 'ro')
-        self.axs[0, 1].plot(self.step_i, self.target_velocity, 'b*')
-        self.axs[0, 2].set_title("R1")
-        self.axs[0, 2].plot(self.step_i, self.R_mpc[0, 0], 'b*')
-        self.axs[1, 0].set_title("R2")
-        self.axs[1, 0].plot(self.step_i, self.R_mpc[1, 1], 'b*')
-        self.axs[2, 0].set_title("Q1")
-        self.axs[2, 0].plot(self.step_i, self.Q_mpc[0, 0], 'b*')
-        self.axs[1, 1].set_title("Q2")
-        self.axs[1, 1].plot(self.step_i, self.Q_mpc[1, 1], 'b*')
-        self.axs[1, 2].set_title("Q3")
-        self.axs[1, 2].plot(self.step_i, self.Q_mpc[2, 2], 'b*')
-        self.axs[2, 1].set_title("Q4")
-        self.axs[2, 1].plot(self.step_i, self.Q_mpc[3, 3], 'b*')
+        if self.step_i % 5 == 0 or plot_weights is False:
+            self.axs[0, 1].plot(self.step_i, self.target_velocity, 'b*')
+            self.axs[0, 2].set_title("R1")
+            self.axs[0, 2].plot(self.step_i, self.R_mpc[0, 0], 'b*')
+            self.axs[1, 0].set_title("R2")
+            self.axs[1, 0].plot(self.step_i, self.R_mpc[1, 1], 'b*')
+            self.axs[2, 0].set_title("Q1")
+            self.axs[2, 0].plot(self.step_i, self.Q_mpc[0, 0], 'b*')
+            self.axs[1, 1].set_title("Q2")
+            self.axs[1, 1].plot(self.step_i, self.Q_mpc[1, 1], 'b*')
+            self.axs[1, 2].set_title("Q3")
+            self.axs[1, 2].plot(self.step_i, self.Q_mpc[2, 2], 'b*')
+            self.axs[2, 1].set_title("Q4")
+            self.axs[2, 1].plot(self.step_i, self.Q_mpc[3, 3], 'b*')
         
         plt.pause(self.dt)
 
