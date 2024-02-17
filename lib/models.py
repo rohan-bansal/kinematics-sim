@@ -40,13 +40,17 @@ class KinematicBicycleModel:
 class CurvilinearKinematicBicycleModel:
 
     # parameters: wheelbase 
-    def __init__(self, path, L):
+    def __init__(self, path, L, control_constraints, state_constraints):
 
         self.path = path
 
         self.L = L
         self.Lf = L/2
         self.Lr = L/2
+
+        self.min_control, self.max_control = control_constraints
+        # TODO: State constraints are currently unused
+        self.min_state, self.max_state = state_constraints
 
     def linearize(self, nominal_state, nominal_ctrl, dt):
 
@@ -122,16 +126,17 @@ class CurvilinearKinematicBicycleModel:
 
         copied_state = state.copy()
         copied_control = control.copy()
+        copied_control = np.minimum(copied_control, self.max_control)
+        copied_control = np.maximum(copied_control, self.min_control)
 
         s, delta, vx, e_y, e_psi = copied_state
         delta_dot = copied_control[0]
         accel = copied_control[1]
 
-
         t = self.path.getTFromLength(s)
         rho = self.path.getCurvature(t)
 
-        s_dot =  1 / (1 - e_y * rho) * (vx - vx * delta * e_psi * self.Lr / (self.Lf + self.Lr))
+        s_dot = 1 / (1 - e_y * rho) * (vx - vx * delta * e_psi * self.Lr / (self.Lf + self.Lr))
         e_psi_dot = vx * delta / (self.Lf + self.Lr) - rho * vx + delta_dot * self.Lr / (self.Lf + self.Lr)
         e_y_dot = vx * delta * self.Lr / (self.Lf + self.Lr) + vx * e_psi
 
@@ -144,4 +149,6 @@ class CurvilinearKinematicBicycleModel:
 
         vx += accel * dt
 
-        return np.array([s, delta, vx, e_y, e_psi])
+        new_state = np.array([s, delta, vx, e_y, e_psi])
+
+        return new_state

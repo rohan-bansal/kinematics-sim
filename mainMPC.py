@@ -4,7 +4,7 @@ import time
 import osqp
 from scipy import sparse
 import scipy
-
+from filterpy.monte_carlo import systematic_resample
 
 from lib.models import CurvilinearKinematicBicycleModel
 from lib.path import CubicHermiteSpline, Pose
@@ -43,32 +43,41 @@ class Main():
 
         fig, self.axs = plt.subplots(3, 3)
 
-        ################## CONTROLLERS ##################
-
-        self.cBicycleModel = CurvilinearKinematicBicycleModel(self.path, self.L)
-
         ################## MPC ##################
 
         self.predHorizon = 20
-        self.Q_mpc = np.diag([0.01, 1.0, 1.0, 1.0])
-        self.R_mpc = np.diag([0.01, 1])
-        self.min_delta, self.max_delta = -np.pi/2, np.pi/2
+        self.Q_mpc = np.diag([0.01, 0.7, 0.8, 0.9])
+        self.R_mpc = np.diag([0.01, 0.9])
+        self.min_delta_dot, self.max_delta_dot = -np.pi/2, np.pi/2
         self.min_acc, self.max_acc = -2, 2
+        self.min_control = np.array([self.min_delta_dot, self.min_acc])
+        self.max_control = np.array([self.max_delta_dot, self.max_acc])
+        self.min_delta, self.max_delta = -np.pi / 4, np.pi / 4
+        self.min_e_psi, self.max_e_psi = -np.inf, np.inf
+        self.min_e_y, self.max_e_y = -np.inf, np.inf
+        self.min_v, self.max_v = 0, np.inf
+        self.min_state = np.array([self.min_delta, self.min_e_psi, self.min_e_y, self.min_v])
+        self.max_state = np.array([self.max_delta, self.max_e_psi, self.max_e_y, self.max_v])
+
+        ################## MODEL ##################
+
+        self.cBicycleModel = CurvilinearKinematicBicycleModel(self.path, self.L, (self.min_control, self.max_control), (self.min_state, self.max_state))
 
         ################## STATE ##################
 
         self.step_i = 0
-        self.target_velocity = 20
+        self.target_velocity = 5.0
 
         ################## PARTICLE FILTER ##################
 
         self.N = 1000
+        self.particle_dynamics_noise_cov = np.diag([0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001])
 
     def generate_uniform_particles(self):
         # Velocity Setpoint, R1, R2, Q1, Q2, Q3, Q4
         eps = 1e-4
         particles = np.empty((self.N, 7))
-        particles[:, 0] = np.random.uniform(5, 30, size=self.N) # Velocity Setpoint
+        particles[:, 0] = np.random.uniform(1, 20, size=self.N) # Velocity Setpoint
         particles[:, 1] = np.random.uniform(eps, 1, size=self.N) # R1
         particles[:, 2] = np.random.uniform(eps, 1, size=self.N) # R2
         particles[:, 3] = np.random.uniform(eps, 1, size=self.N) # Q1
@@ -101,11 +110,22 @@ class Main():
         weights += 1.e-300
         weights /= sum(weights)
 
+        N_eff = np.sum(weights)**2 / np.sum(weights**2)
+        print(N_eff)
+        if N_eff < 100:
+            idxs = systematic_resample(weights)
+            weights = weights[idxs] / np.sum(weights[idxs])
+            particles = particles[idxs]
+        noise = np.random.multivariate_normal(np.zeros(particles.shape[1]), self.particle_dynamics_noise_cov, particles.shape[0])
+        particles += noise
+        particles = np.maximum(particles, 1e-6)
+        assert (particles > 0).all()
+
         # estimate mean and variance
         mean = np.average(particles, weights=weights, axis=0)
         var = np.average((particles - mean)**2, weights=weights, axis=0)
 
-        return mean, var, weights
+        return mean, var, weights, particles
     
     def sim_step(self, prob, particle, cur_state):
 
@@ -129,10 +149,10 @@ class Main():
         N = self.predHorizon
         nx, nu = [4, 2]
 
-        umin = np.array([self.min_delta, self.min_acc])
-        umax = np.array([self.max_delta, self.max_acc])
-        xmin = np.array([-1*np.pi, -1*np.inf, -1*np.inf, 0])
-        xmax = np.array([np.pi, np.inf, np.inf, np.inf])
+        umin = self.min_control
+        umax = self.max_control
+        xmin = self.min_state
+        xmax = self.max_state
         x0 = np.hstack((measured_state[1], measured_state[4], measured_state[3], measured_state[2]))
         xr = np.array([0, 0, 0, target_vel])
 
@@ -215,10 +235,10 @@ class Main():
         N = self.predHorizon
         nx, nu = [4, 2]
 
-        umin = np.array([self.min_delta, self.min_acc])
-        umax = np.array([self.max_delta, self.max_acc])
-        xmin = np.array([-1*np.pi, -1*np.inf, -1*np.inf, 0])
-        xmax = np.array([np.pi, np.inf, np.inf, np.inf])
+        umin = self.min_control
+        umax = self.max_control
+        xmin = self.min_state
+        xmax = self.max_state
         x0 = np.hstack((measured_state[1], measured_state[4], measured_state[3], measured_state[2]))
         xr = np.array([0, 0, 0, target_vel])
 
@@ -296,32 +316,50 @@ class Main():
         state = self.cBicycleModel.propagate(state, control, self.dt)
         new_state = state.copy()
 
-        mean, var, weights = self.pf(old_state, new_state, pf_particles, pf_weights)
+        mean, var, pf_weights, pf_particles = self.pf(old_state, new_state, pf_particles, pf_weights)
+
+        plot_weights = False
 
         self.axs[0, 1].set_title("target velocity")
-        self.axs[0, 1].plot(self.step_i, mean[0], 'ro')
+        if plot_weights:
+            self.axs[0, 1].scatter([self.step_i]*self.N, pf_particles[:, 0], marker='o', c='r', alpha=weights)
+            self.axs[0, 2].scatter([self.step_i]*self.N, pf_particles[:, 1], marker='o', c='r', alpha=weights)
+            self.axs[1, 0].scatter([self.step_i] * self.N, pf_particles[:, 2], marker='o', c='r', alpha=weights)
+            self.axs[2, 0].scatter([self.step_i] * self.N, pf_particles[:, 3], marker='o', c='r', alpha=weights)
+            self.axs[1, 1].scatter([self.step_i] * self.N, pf_particles[:, 4], marker='o', c='r', alpha=weights)
+            self.axs[1, 2].scatter([self.step_i] * self.N, pf_particles[:, 5], marker='o', c='r', alpha=weights)
+            self.axs[2, 1].scatter([self.step_i] * self.N, pf_particles[:, 6], marker='o', c='r', alpha=weights)
+        else:
+            self.axs[0, 1].plot(self.step_i, mean[0], 'ro')
+            self.axs[0, 2].plot(self.step_i, mean[1], 'ro')
+            self.axs[1, 0].plot(self.step_i, mean[2], 'ro')
+            self.axs[2, 0].plot(self.step_i, mean[3], 'ro')
+            self.axs[1, 1].plot(self.step_i, mean[4], 'ro')
+            self.axs[1, 2].plot(self.step_i, mean[5], 'ro')
+            self.axs[2, 1].plot(self.step_i, mean[6], 'ro')
+        self.axs[0, 1].plot(self.step_i, self.target_velocity, 'b*')
         self.axs[0, 2].set_title("R1")
-        self.axs[0, 2].plot(self.step_i, mean[1], 'ro')
+        self.axs[0, 2].plot(self.step_i, self.R_mpc[0, 0], 'b*')
         self.axs[1, 0].set_title("R2")
-        self.axs[1, 0].plot(self.step_i, mean[2], 'ro')
+        self.axs[1, 0].plot(self.step_i, self.R_mpc[1, 1], 'b*')
         self.axs[2, 0].set_title("Q1")
-        self.axs[2, 0].plot(self.step_i, mean[3], 'ro')
+        self.axs[2, 0].plot(self.step_i, self.Q_mpc[0, 0], 'b*')
         self.axs[1, 1].set_title("Q2")
-        self.axs[1, 1].plot(self.step_i, mean[4], 'ro')
+        self.axs[1, 1].plot(self.step_i, self.Q_mpc[1, 1], 'b*')
         self.axs[1, 2].set_title("Q3")
-        self.axs[1, 2].plot(self.step_i, mean[5], 'ro')
+        self.axs[1, 2].plot(self.step_i, self.Q_mpc[2, 2], 'b*')
         self.axs[2, 1].set_title("Q4")
-        self.axs[2, 1].plot(self.step_i, mean[6], 'ro')
+        self.axs[2, 1].plot(self.step_i, self.Q_mpc[3, 3], 'b*')
         
         plt.pause(self.dt)
 
-        return state, end
+        return state, pf_particles, pf_weights, end
         
 
 if __name__ == "__main__":
 
     #s, delta, vx, e_y, e_psi
-    state = np.array([0, 0, 0.01, 0, 0])
+    state = np.array([0, 0, 2.0, 0, 0])
     end = False
     
     mainFunc = Main()
@@ -332,7 +370,7 @@ if __name__ == "__main__":
     try:
         while True:
             if not end:
-                state, end = mainFunc.loop(state, particles, weights)
+                state, particles, weights, end = mainFunc.loop(state, particles, weights)
             
     except KeyboardInterrupt:
         pass
