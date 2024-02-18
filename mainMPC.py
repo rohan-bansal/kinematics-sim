@@ -127,23 +127,24 @@ class Main():
         var = np.average((particles - mean)**2, weights=weights, axis=0)
 
         # get expected particle using weighted average
-        # expected_particle = np.average(particles, weights=weights, axis=0)
-        # print(expected_particle)
+        expected_particle = np.average(particles, weights=weights, axis=0)
+        print(expected_particle)
 
-        # horizon = self.mpc_osqp(
-        #     old_state, 
-        #     expected_particle[0], 
-        #     np.diag([expected_particle[3], expected_particle[4], expected_particle[5], expected_particle[6]]), 
-        #     np.diag([expected_particle[1], expected_particle[2]]), returnEntireHorizon=True)
+        horizon = self.mpc_osqp(
+            old_state, 
+            expected_particle[0], 
+            np.diag([expected_particle[3], expected_particle[4], expected_particle[5], expected_particle[6]]), 
+            np.diag([expected_particle[1], expected_particle[2]]), returnEntireHorizon=True)
         
-        # forward_predicted_state = self.forward_predict(new_state, horizon)
+        forward_predicted_state = self.forward_predict(new_state, horizon)
 
-        # x, y = self.path.getPosition(self.path.getTFromLength(forward_predicted_state[0]))
+        x, y = self.cBicycleModel.get_cartesian_position(forward_predicted_state)
+
 
         # calculate actual - predicted here, graph
 
 
-        return mean, var, weights
+        return mean, var, weights, particles
     
     def forward_predict(self, cur_state, horizon_inputs):
             
